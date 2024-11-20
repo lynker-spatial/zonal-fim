@@ -139,3 +139,5 @@ def read_gr3(file_path: str) -> Tuple[pd.DataFrame, pd.DataFrame, List[List[str]
     elements_df = pd.DataFrame(elements)
 
     return nodes_df, elements_df, extra_lines
+
+   
