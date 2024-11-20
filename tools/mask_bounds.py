@@ -66,9 +66,21 @@ def create_general_mask(database_path: str, triangles_path: str,
     water =  mask_conn.table(water_table_name).execute()
     water = water.set_crs("EPSG:4326")
 
-    step_1 = gpd.GeoDataFrame(geometry=sch_b.buffer(3))
-    step_1 = step_1.dissolve(by=None)
-    step_1 = gpd.overlay(step_1, sch_b, how='difference')
+    # Setup bounds
+    sch_bb = gpd.GeoDataFrame(geometry=sch_b.buffer(3))
+    sch_bb = sch_bb.dissolve(by=None)
+    state = gpd.overlay(state, sch_bb, how="intersection")
+    levee = gpd.overlay(levee, sch_bb, how="intersection")
+    nwm = gpd.overlay(nwm, sch_bb, how="intersection")
+    water = gpd.overlay(water, sch_bb, how="intersection")
+
+    # Implement 5 step masking logic
+    # 1. "mask_schism_boundary_atlantic.shp","exterior"
+    # 2. "mask_state_boundaries_conus.shp","exterior"
+    # 3. "mask_levee_protected_area_conus.shp","interior"
+    # 4. "mask_nwm_lakes_conus.shp","interior"
+    # 5. "mask_water_polygon_conus.shp","interior" 
+    step_1 = gpd.overlay(sch_bb, sch_b, how='difference')
     step_2 = gpd.GeoDataFrame(geometry=state.buffer(5))
     step_2 = step_2.dissolve(by=None)
     step_2 = gpd.overlay(step_2, state, how='difference')
