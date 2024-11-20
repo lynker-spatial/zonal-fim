@@ -1,5 +1,6 @@
 # tools/read_schisim.py
 import pandas as pd
+import geopandas as gpd
 from typing import List, Tuple
 
 # ----------------- Read 2dm file
@@ -140,4 +141,9 @@ def read_gr3(file_path: str) -> Tuple[pd.DataFrame, pd.DataFrame, List[List[str]
 
     return nodes_df, elements_df, extra_lines
 
-   
+def index_triangles(triangles_path: str) -> None:
+    triangle_shapes = gpd.read_parquet(triangles_path)
+    triangle_shapes.rename(columns={'FID': 'pg_id'}, inplace=True)
+    triangle_shapes['pg_id'] += 1
+    triangle_shapes.to_parquet(triangles_path, index=False)
+    return
