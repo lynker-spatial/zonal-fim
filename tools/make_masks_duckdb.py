@@ -5,9 +5,6 @@ import ibis
 import shutil
 from pathlib import Path
 
-zip_folder_path = "/mnt/e/costal_fim/ocean_mask/atlgulf/atlgulf/"
-duckdb_path = "atlgulf/masks.duckdb"
-
 def make_masks_duckdb(zip_folder_path: str, duckdb_path: str) -> None:
     """
     Extracts shapefiles from zipped archives in a folder and saves them as tables in a DuckDB database.
@@ -70,6 +67,18 @@ def make_masks_duckdb(zip_folder_path: str, duckdb_path: str) -> None:
                                 print(f"Error saving {table_name} to DuckDB: {e}")
             except Exception as e:
                 print(f"Error processing {zip_path}: {e}")
+    
+    # Save crs info
+    mask_conn.raw_sql("""
+    CREATE TABLE IF NOT EXISTS metadata (
+        table_name STRING,
+        crs STRING
+        )
+    """)
+    mask_conn.raw_sql("""
+        INSERT INTO metadata (table_name, crs)
+        VALUES ('masks', 'EPSG:4326')
+    """)
 
     # Cleanup the temporary folder
     shutil.rmtree(extraction_path, ignore_errors=True)
