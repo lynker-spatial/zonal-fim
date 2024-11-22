@@ -7,9 +7,12 @@ from rasterio.features import shapes
 import geopandas as gpd
 from shapely.geometry import shape
 from rasterio.session import AWSSession
+from rio_tiler.errors import PointOutsideBounds
 from rio_tiler.io import COGReader
 import rasterio
 import boto3
+import numpy as np
+from tqdm import tqdm
 import os
 
 def add_point_geo(database_path: str, lat_col_nam: str, long_col_name: str):
@@ -107,10 +110,20 @@ def extract_elevation(s3_path: str, database_path: str) -> gpd.GeoDataFrame([]):
 
         # Extract raster values for the transformed points
         coords = [(geom.x, geom.y) for geom in point_gdf["geometry"]]
-        values = [cog.point(x, y, coord_crs=raster_crs).array[0] for x, y in coords]
+        # Disregard nodes with no elevation data
+        values = []
+        for x, y in tqdm(coords):
+            try:
+                # Extract the value
+                value = cog.point(x, y, coord_crs=raster_crs).array[0]
+                values.append(value)
+            except PointOutsideBounds:
+                # Assign NaN if the point is outside the raster bounds
+                values.append(np.nan)
     
     # Add the extracted raster values to the Ibis DuckDB table
     point_gdf["elevation"] = values
     # transform back to the 4326
     point_gdf.to_crs('EPSG:4326')
     data_conn.write_to_table(point_gdf, "nodes")
+    return 
