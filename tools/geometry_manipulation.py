@@ -6,19 +6,25 @@ import rasterio
 from rasterio.features import shapes
 import geopandas as gpd
 from shapely.geometry import shape
+from rasterio.session import AWSSession
+from rio_tiler.io import COGReader
+import rasterio
+import boto3
+import os
 
 def add_point_geo(database_path: str, lat_col_nam: str, long_col_name: str):
     data_conn = ibis.duckdb.connect(database_path)
     data_conn.raw_sql('LOAD spatial')
-    data_conn.list_tables()
     data_conn.raw_sql(f""" 
-                  ALTER TABLE nodes ADD COLUMN geometry GEOMETRY; 
-                  UPDATE nodes SET geometry = ST_Point({long_col_name}, {lat_col_nam}); 
-                  """)
+    ALTER TABLE nodes ADD COLUMN geometry GEOMETRY; 
+    UPDATE nodes SET geometry = ST_Point({long_col_name}, {lat_col_nam}); 
+    """)
     data_conn.close()
     return
 
-def get_none_overlapping(s3_path: str, point_gdf: gpd.GeoDataFrame([])) -> gpd.GeoDataFrame([]):
+def get_none_overlapping(s3_path: str, database_path: str, point_gdf: gpd.GeoDataFrame([])) -> None:
+    data_conn = ibis.duckdb.connect(database_path)
+    data_conn.raw_sql('LOAD spatial')
 
     # Vectorize raster
     with rasterio.open(s3_path) as src:
@@ -36,5 +42,75 @@ def get_none_overlapping(s3_path: str, point_gdf: gpd.GeoDataFrame([])) -> gpd.G
         points_gdf = points_gdf.to_crs(raster_gdf.crs)
     print(f"Computing under crs: {raster_gdf.crs}")
 
-    points_outside_raster = points_gdf[~points_gdf.within(raster_gdf.geometry.iloc[0])]
-    return points_outside_raster
+    # Store to database
+    directory = 'temp'
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+    raster_temp_file = os.path.join(directory, 'dem_bounds.parquet')
+    point_temp_file = os.path.join(directory, 'transformed_nodes.parquet')
+
+    raster_gdf.to_parquet(raster_temp_file, index=False)
+    points_gdf.to_parquet(point_temp_file, index=False)
+
+    data_conn.raw_sql(f"""
+    CREATE OR REPLACE TABLE dem_bounds AS
+    SELECT * FROM '{raster_temp_file}';
+    CREATE OR REPLACE TABLE transformed_nodes AS
+    SELECT * FROM '{point_temp_file}';
+    """)
+    os.remove(raster_temp_file)
+    os.remove(point_temp_file)
+    os.rmdir(directory)
+
+    # Find all that fall outside
+    data_conn.raw_sql(f"""
+    CREATE TABLE points_outside_dem AS
+    SELECT tn.*
+    FROM transformed_nodes AS tn
+    LEFT JOIN dem_bounds AS db
+    ON ST_Intersects(tn.geometry, db.geometry)
+    WHERE db.geometry IS NULL;
+    """)
+
+    # Save crs info
+    data_conn.raw_sql("""
+    CREATE TABLE IF NOT EXISTS metadata (
+        table_name STRING,
+        crs STRING
+        )
+    """)
+    data_conn.raw_sql(f"""
+        INSERT INTO metadata (table_name, crs)
+        VALUES 
+            ('points_outside_dem', '{raster_gdf.crs.to_string()}'),
+            ('dem_bounds', '{raster_gdf.crs.to_string()}'),
+            ('transformed_nodes', '{raster_gdf.crs.to_string()}');
+    """)
+
+    return 
+
+def extract_elevation(s3_path: str, database_path: str) -> gpd.GeoDataFrame([]):
+
+    data_conn = ibis.duckdb.connect(database_path)
+    data_conn.raw_sql('LOAD spatial')
+    point_gdf = data_conn.table("nodes").execute()
+
+    with COGReader(s3_path) as cog:
+        raster_crs = cog.dataset.crs
+        points_crs = point_gdf.crs
+        if points_crs != raster_crs:
+            print("CRS mismatch detected. Transforming points to match raster CRS.")
+            point_gdf = point_gdf.to_crs(raster_crs)
+            print(f"new CRS: {point_gdf.crs}")
+        else:
+            print("CRS match. No transformation required.")
+
+        # Extract raster values for the transformed points
+        coords = [(geom.x, geom.y) for geom in point_gdf["geometry"]]
+        values = [cog.point(x, y, coord_crs=raster_crs).array[0] for x, y in coords]
+    
+    # Add the extracted raster values to the Ibis DuckDB table
+    point_gdf["elevation"] = values
+    # transform back to the 4326
+    point_gdf.to_crs('EPSG:4326')
+    data_conn.write_to_table(point_gdf, "nodes")
