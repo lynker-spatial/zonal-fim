@@ -136,5 +136,5 @@ def create_general_mask(database_path: str, triangles_path: str,
     # Cleanup
     os.remove(temp_file)
     os.rmdir(directory)
-
+    mask_conn.close()
     return
