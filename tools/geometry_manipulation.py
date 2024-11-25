@@ -116,14 +116,25 @@ def extract_elevation(s3_path: str, database_path: str) -> gpd.GeoDataFrame([]):
             try:
                 # Extract the value
                 value = cog.point(x, y, coord_crs=raster_crs).array[0]
-                values.append(value)
+                values.append(float(value))
             except PointOutsideBounds:
                 # Assign NaN if the point is outside the raster bounds
                 values.append(np.nan)
     
     # Add the extracted raster values to the Ibis DuckDB table
     point_gdf["elevation"] = values
-    # transform back to the 4326
+    # Transform back to the 4326 and save
     point_gdf.to_crs('EPSG:4326')
-    data_conn.write_to_table(point_gdf, "nodes")
+    directory = 'temp'
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+    temp_file = os.path.join(directory, 'elevation.parquet')
+    point_gdf.to_parquet(temp_file, index=False)
+    data_conn.raw_sql(f"""
+                        CREATE OR REPLACE TABLE nodes_elevation AS 
+                        SELECT * FROM '{temp_file}'
+                        """)
+    os.remove(temp_file)
+    os.rmdir(directory)
+    data_conn.close()
     return 
