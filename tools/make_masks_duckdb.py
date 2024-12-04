@@ -85,3 +85,4 @@ def make_masks_duckdb(zip_folder_path: str, duckdb_path: str) -> None:
     mask_conn.close()
     print("All shapefiles have been successfully saved to the DuckDB database.")
     return
+
