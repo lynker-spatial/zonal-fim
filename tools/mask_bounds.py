@@ -136,7 +136,7 @@ def create_general_mask(database_path: str, triangles_path: str,
     # Cleanup
     os.remove(temp_file)
     os.rmdir(directory)
-    mask_conn.close()
+    mask_conn.con.close()
     return
 
 def filter_valid_elements(data_database_path: str, mask_database_path: str) -> None:
@@ -181,5 +181,5 @@ def filter_valid_elements(data_database_path: str, mask_database_path: str) -> N
         SELECT node_id_3 FROM null_filtered_masked_elements
     );
     """)
-
+    data_conn.con.close()
     return

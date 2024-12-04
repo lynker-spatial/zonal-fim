@@ -82,7 +82,7 @@ def make_masks_duckdb(zip_folder_path: str, duckdb_path: str) -> None:
 
     # Cleanup the temporary folder
     shutil.rmtree(extraction_path, ignore_errors=True)
-    mask_conn.close()
+    mask_conn.con.close()
     print("All shapefiles have been successfully saved to the DuckDB database.")
     return
 
