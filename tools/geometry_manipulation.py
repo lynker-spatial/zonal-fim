@@ -61,9 +61,9 @@ def get_none_overlapping(s3_path: str, database_path: str, point_gdf_table: str)
     raster_gdf = gpd.GeoDataFrame(geometry=raster_polygons, crs=raster_crs)
 
     # Match crs
-    point_gdf = data_conn.table(point_gdf_table).execute()
-    point_gdf = point_gdf.set_crs(epsg=4326)
-    if raster_gdf.crs != point_gdf.crs:
+    points_gdf = data_conn.table(point_gdf_table).execute()
+    points_gdf = points_gdf.set_crs(epsg=4326)
+    if raster_gdf.crs != points_gdf.crs:
         points_gdf = points_gdf.to_crs(raster_gdf.crs)
     print(f"Computing under crs: {raster_gdf.crs}")
 
@@ -89,7 +89,7 @@ def get_none_overlapping(s3_path: str, database_path: str, point_gdf_table: str)
 
     # Find all that fall outside
     data_conn.raw_sql(f"""
-    CREATE TABLE points_outside_dem AS
+    CREATE OR REPLACE TABLE points_outside_dem AS
     SELECT tn.*
     FROM transformed_nodes AS tn
     LEFT JOIN dem_bounds AS db
