@@ -62,7 +62,7 @@ def get_none_overlapping(s3_path: str, database_path: str, point_gdf_table: str)
 
     # Match crs
     point_gdf = data_conn.table(point_gdf_table).execute()
-    point_gdf = point_gdf.set_src(epsg=4326)
+    point_gdf = point_gdf.set_crs(epsg=4326)
     if raster_gdf.crs != point_gdf.crs:
         points_gdf = points_gdf.to_crs(raster_gdf.crs)
     print(f"Computing under crs: {raster_gdf.crs}")
