@@ -83,26 +83,34 @@ def create_general_mask(database_path: str, triangles_path: str,
     # 5. "mask_water_polygon_conus.shp","interior" 
     step_1 = gpd.overlay(sch_bb, sch_b, how='difference')
     step_1 = step_1[['geometry']]
+    print('Completed step_1 ...')
     step_2 = gpd.GeoDataFrame(geometry=state.buffer(5))
     step_2 = step_2.dissolve(by=None)
     step_2 = gpd.overlay(step_2, state, how='difference')
     step_2 = gpd.overlay(step_2, sch_b, how='difference')
     step_2 = gpd.overlay(step_1, step_2, how='union').dissolve(by=None)
     step_2 = step_2[['geometry']]
+    print('Completed step_2 ...')
     if dissolve:
         step_3 = gpd.overlay(step_2, levee, how='union').dissolve(by=None)
         step_3 = step_3[['geometry']]
+        print('Completed step_3 ...')
         step_4 = gpd.overlay(step_3, nwm, how='union').dissolve(by=None)
         step_4 = step_4[['geometry']]
+        print('Completed step_4 ...')
         step_5 = gpd.overlay(step_4, water, how='union').dissolve(by=None)
         step_5 = step_5[['geometry']]
+        print('Completed step_5 ...')
     else:
         step_3 = gpd.overlay(step_2, levee, how='union')
         step_3 = step_3[['geometry']]
+        print('Completed step_3 ...')
         step_4 = gpd.overlay(step_3, nwm, how='union')
         step_4 = step_4[['geometry']]
+        print('Completed step_4 ...')
         step_5 = gpd.overlay(step_4, water, how='union')
         step_5 = step_5[['geometry']]
+        print('Completed step_5 ...')
     # Ensure crs is set
     step_5 = step_5.set_crs("EPSG:4326") 
     
@@ -134,9 +142,10 @@ def create_general_mask(database_path: str, triangles_path: str,
                             OR NOT ST_Intersects(t.geometry, s.geometry); -- Keep triangles that do not intersect at all
                         """)
     # Cleanup
+    print('Completed masking.')
     os.remove(temp_file)
     os.rmdir(directory)
-    mask_conn.close()
+    mask_conn.con.close()
     return
 
 def filter_valid_elements(data_database_path: str, mask_database_path: str) -> None:
@@ -181,5 +190,5 @@ def filter_valid_elements(data_database_path: str, mask_database_path: str) -> N
         SELECT node_id_3 FROM null_filtered_masked_elements
     );
     """)
-
+    data_conn.con.close()
     return
