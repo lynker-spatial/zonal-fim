@@ -41,6 +41,7 @@ failed_downloads.txt
 *.tif
 
 # Folders
+data/*
 DEM/*
 saved_batches*/*
 constant_n/model/*
