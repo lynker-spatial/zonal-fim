@@ -44,7 +44,7 @@ def extract_elevation(raster_path: str, points_df: gpd.GeoDataFrame()) -> gpd.Ge
     points_df.to_crs('EPSG:4326')
     return points_df
 
-def calculate_slope(vertex: np.array(), other_vertex1: np.array(), other_vertex2: np.array()) -> float:
+def calculate_slope(vertex: np.ndarray, other_vertex1: np.ndarray, other_vertex2: np.ndarray) -> float:
     # Vectors from the vertex to the other two vertices
     vector1 = other_vertex1 - vertex
     vector2 = other_vertex2 - vertex
@@ -64,7 +64,7 @@ def calculate_slope(vertex: np.array(), other_vertex1: np.array(), other_vertex2
     # The final slope is the average of the two slopes
     return (slope1 + slope2) / 2
 
-def calculate_barycentric_weights(triangle_points: np.array()) -> np.array():
+def calculate_barycentric_weights(triangle_points: np.ndarray) -> np.ndarray:
     # Calculate the slopes for each vertex
     A_point = triangle_points[0]
     B_point = triangle_points[1]
@@ -116,7 +116,7 @@ def calculate_barycentric_weights(triangle_points: np.array()) -> np.array():
 def compute_3d_barycentric(database_path: str, raster_path: str, node_table_name: str, 
                            element_table_name: str) -> None:
     
-    data_conn = duckdb.connect(database_path)
+    data_conn = ibis.duckdb.connect(database_path)
     data_conn.raw_sql('LOAD spatial')
     nodes_df = data_conn.table(node_table_name).execute()
     nodes_df = nodes_df.set_crs(epsg='4326')
@@ -137,7 +137,7 @@ def compute_3d_barycentric(database_path: str, raster_path: str, node_table_name
     triangles = triangles_df.drop(columns=['pg_id']).to_numpy()
     
     # Process the triangle data in batches
-    batch_size = 500000
+    batch_size = 100000
     num_batches = len(triangles) // batch_size + (1 if len(triangles) % batch_size != 0 else 0)
     output_folder = 'temp'  
     os.makedirs(output_folder, exist_ok=True)
@@ -207,23 +207,52 @@ def compute_3d_barycentric(database_path: str, raster_path: str, node_table_name
 
     # Assign the new column names to the DataFrame
     final_weights_raw.columns = new_column_names
-    final_weights_raw
 
     new_column_names = ['centroid_long', 'centroid_lat', 'swe_weighted_average']
-
     # Assign the new column names to the DataFrame
     final_weighted_centers.columns = new_column_names
-    final_weighted_centers
 
     elements_df_combined = pd.concat([triangles_df, final_weights_raw, final_weighted_centers], axis=1)
-    elements_df_combined
+    
+    # Merge with triangles
+    output_path = os.path.join(output_folder, 'bary_centroids.parquet')
+    elements_df_combined.to_parquet(output_path, index=False)
+    data_conn.raw_sql(f"""
+    CREATE OR REPLACE TABLE triangles AS
+    SELECT * FROM '{output_path}'
+    """)
+    
+    data_conn.raw_sql("""
+    CREATE OR REPLACE TABLE triangle_elements AS
+    SELECT
+            el.*,
+            tr.* EXCLUDE (pg_id)
+    FROM 
+        elements AS el
+    LEFT JOIN
+        triangles AS tr
+    ON
+        el.pg_id = tr.pg_id;
+    """)
 
-    elements_df_combined.to_parquet('data/bary_centroids.parquet', index=False)
+    # Look for any problems
+    triangle_elements = data_conn.table('triangle_elements')
+    nan_counts = triangle_elements.aggregate(
+        **{
+            column: triangle_elements[column].isnull().sum().name(f"{column}_nan_count")
+            for column in triangle_elements.columns
+        }
+    )
+    nan_counts_result = nan_counts.execute()
+    nan_flag = nan_counts_result.sum().sum()
+    if nan_flag == 0:
+        print("Found nan in triangles check previous steps")
+        print(nan_counts_result)
 
     # Clean up
     if os.path.exists(output_folder):
         shutil.rmtree(output_folder)
     else:
         print(f"The folder '{output_folder}' does not exist.")
-    
+    data_conn.con.close()
     return
