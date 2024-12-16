@@ -54,5 +54,6 @@ if __name__ == '__main__':
     print('Completed barycentric. \n')
     print('Masking elements, nodes, and DEM...')
     mb.filter_valid_elements(data_database_path=database_path, mask_database_path=mask_database_path)
+    mb.mask_raster(mask_database_path=mask_database_path, raster_path=s3_path)
     print('Masking complete. \n')
     print('Script end.')
