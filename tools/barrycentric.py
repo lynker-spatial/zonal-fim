@@ -235,6 +235,19 @@ def compute_3d_barycentric(database_path: str, raster_path: str, node_table_name
         el.pg_id = tr.pg_id;
     """)
 
+    # Save crs info
+    data_conn.raw_sql("""
+    CREATE TABLE IF NOT EXISTS metadata (
+        table_name STRING,
+        crs STRING
+        )
+    """)
+    data_conn.raw_sql("""
+        INSERT INTO metadata (table_name, crs)
+        VALUES ('triangles', 'EPSG:4326'),
+        VALUES ('triangle_elements', 'EPSG:4326')              
+    """)
+
     # Look for any problems
     triangle_elements = data_conn.table('triangle_elements')
     nan_counts = triangle_elements.aggregate(
@@ -248,6 +261,12 @@ def compute_3d_barycentric(database_path: str, raster_path: str, node_table_name
     if nan_flag == 0:
         print("Found nan in triangles check previous steps")
         print(nan_counts_result)
+    
+    # Save for R
+    triangle_elements = data_conn.table('triangle_elements').execute()
+    triangle_elements = triangle_elements.set_crs(epsg=4326)
+    print("Saving to gpkg for R ...")
+    triangle_elements.to_file("data/bary_triangles.gpkg", layer="triangles", driver="GPKG")
 
     # Clean up
     if os.path.exists(output_folder):
