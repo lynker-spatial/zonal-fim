@@ -122,7 +122,17 @@ def compute_3d_barycentric(database_path: str, raster_path: str, node_table_name
     nodes_df = nodes_df.set_crs(epsg='4326')
 
     # Extract elevation
+    output_folder = 'temp'  
+    os.makedirs(output_folder, exist_ok=True)
     nodes_df = extract_elevation(raster_path, nodes_df)
+    temp_file = os.path.join(output_folder, 'elevation.parquet')
+    nodes_df.to_parquet(temp_file, index=False)
+    data_conn.raw_sql(f"""
+                        CREATE OR REPLACE TABLE nodes_elevation AS 
+                        SELECT * FROM '{temp_file}'
+                        """)
+    os.remove(temp_file)
+    
     points_dem = nodes_df[['long', 'lat', 'elevation']].to_numpy()  
     points_swe = nodes_df[['long', 'lat', 'wse']].to_numpy() 
 
@@ -139,8 +149,7 @@ def compute_3d_barycentric(database_path: str, raster_path: str, node_table_name
     # Process the triangle data in batches
     batch_size = 100000
     num_batches = len(triangles) // batch_size + (1 if len(triangles) % batch_size != 0 else 0)
-    output_folder = 'temp'  
-    os.makedirs(output_folder, exist_ok=True)
+    
 
     for batch_num in tqdm(range(num_batches), desc="Processing batches"):
         start_idx = batch_num * batch_size
