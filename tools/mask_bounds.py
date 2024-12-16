@@ -4,6 +4,8 @@ import ibis
 from ibis import _
 import geopandas as gpd
 import os
+import rasterio
+from rasterio.mask import mask
 
 ibis.options.interactive = True
 
@@ -55,7 +57,11 @@ def create_general_mask(database_path: str, triangles_path: str,
      
     # Create a single mask
     mask_conn = ibis.duckdb.connect(database_path)
-    mask_conn.raw_sql('LOAD spatial')
+    try:
+        mask_conn.raw_sql('LOAD spatial')
+    except: 
+        mask_conn.raw_sql('INSTALL spatial')
+        mask_conn.raw_sql('LOAD spatial')
     sch_b = mask_conn.table(schisim_table_name).execute()
     sch_b = sch_b.set_crs("EPSG:4326")
     state = mask_conn.table(state_table_name).execute()
@@ -191,4 +197,35 @@ def filter_valid_elements(data_database_path: str, mask_database_path: str) -> N
     );
     """)
     data_conn.con.close()
+    return
+
+def mask_raster(mask_database_path: str, raster_path: str) -> None:
+    # Load mask
+    mask_conn = ibis.duckdb.connect(mask_database_path)
+    try:
+        mask_conn.raw_sql('LOAD spatial')
+    except: 
+        mask_conn.raw_sql('INSTALL spatial')
+        mask_conn.raw_sql('LOAD spatial')
+    mask_gdf = mask_conn.table('step_5').execute()
+    mask_gdf = mask_gdf.set_crs("EPSG:4326")
+
+    # Load DEM
+    with rasterio.open(raster_path) as src:
+        raster_meta = src.meta
+    if mask_gdf.crs != raster_meta['crs']:
+        mask_gdf = mask_gdf.to_crs(raster_meta['crs'])
+
+    # Mask DEM
+    with rasterio.open(raster_path) as src:
+        out_image, out_transform = mask(src, mask_gdf.geometry, crop=True)
+        out_meta = src.meta.copy()
+        out_meta.update({"driver": "GTiff",
+                        "height": out_image.shape[1],
+                        "width": out_image.shape[2],
+                        "transform": out_transform,
+                        "crs": "EPSG:4326"})
+    # Save masked DEM
+    with rasterio.open("data/DEM_masked_4326.tif", 'w', **out_meta) as dest:
+        dest.write(out_image)
     return
