@@ -14,3 +14,4 @@ def read_zonal_outputs(database_path: str, zonal_output_path: str) -> None:
     """)
     data_conn.con.close()
     return
+
