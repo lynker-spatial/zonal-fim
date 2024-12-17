@@ -14,35 +14,35 @@ import os
 import shutil
 
 
-def extract_elevation(raster_path: str, points_df: gpd.GeoDataFrame()) -> gpd.GeoDataFrame():
-    with COGReader(raster_path) as cog:
-        # Fix crs mismatches
-        raster_crs = cog.dataset.crs
-        points_crs = points_df.crs
-        if points_crs != raster_crs:
-            print("CRS mismatch detected. Transforming points to match raster CRS.")
-            points_df = points_df.to_crs(raster_crs)
-            print(f"new CRS: {points_df.crs}")
-        else:
-            print("CRS match. No transformation required.")
+# def extract_elevation(raster_path: str, points_df: gpd.GeoDataFrame()) -> gpd.GeoDataFrame():
+#     with COGReader(raster_path) as cog:
+#         # Fix crs mismatches
+#         raster_crs = cog.dataset.crs
+#         points_crs = points_df.crs
+#         if points_crs != raster_crs:
+#             print("CRS mismatch detected. Transforming points to match raster CRS.")
+#             points_df = points_df.to_crs(raster_crs)
+#             print(f"new CRS: {points_df.crs}")
+#         else:
+#             print("CRS match. No transformation required.")
 
-        # Extract raster values for the transformed points
-        coords = [(geom.x, geom.y) for geom in points_df["geometry"]]
-        values = []
-        for x, y in tqdm(coords):
-            try:
-                value = cog.point(x, y, coord_crs=raster_crs).array[0]
-                values.append(float(value))
-            except PointOutsideBounds:
-                # Assign NaN if the point is outside the raster bounds
-                values.append(np.nan)
+#         # Extract raster values for the transformed points
+#         coords = [(geom.x, geom.y) for geom in points_df["geometry"]]
+#         values = []
+#         for x, y in tqdm(coords):
+#             try:
+#                 value = cog.point(x, y, coord_crs=raster_crs).array[0]
+#                 values.append(float(value))
+#             except PointOutsideBounds:
+#                 # Assign NaN if the point is outside the raster bounds
+#                 values.append(np.nan)
 
 
-    # Add the extracted raster values to the Ibis DuckDB table
-    points_df["elevation"] = values
-    # transform back to the 4326
-    points_df.to_crs('EPSG:4326')
-    return points_df
+#     # Add the extracted raster values to the Ibis DuckDB table
+#     points_df["elevation"] = values
+#     # Transform back to the 4326
+#     points_df.to_crs('EPSG:4326')
+#     return points_df
 
 def calculate_slope(vertex: np.ndarray, other_vertex1: np.ndarray, other_vertex2: np.ndarray) -> float:
     # Vectors from the vertex to the other two vertices
@@ -117,33 +117,30 @@ def compute_3d_barycentric(database_path: str, raster_path: str, node_table_name
                            element_table_name: str) -> None:
     
     data_conn = ibis.duckdb.connect(database_path)
-    data_conn.raw_sql('LOAD spatial')
+    try:
+        data_conn.raw_sql('LOAD spatial')
+    except: 
+        data_conn.raw_sql('INSTALL spatial')
+        data_conn.raw_sql('LOAD spatial')
     nodes_df = data_conn.table(node_table_name).execute()
     nodes_df = nodes_df.set_crs(epsg='4326')
-
-    # Extract elevation
+    points_dem = nodes_df[['long', 'lat', 'elevation']].to_numpy()  
+    
     output_folder = 'temp'  
     os.makedirs(output_folder, exist_ok=True)
-    nodes_df = extract_elevation(raster_path, nodes_df)
-    temp_file = os.path.join(output_folder, 'elevation.parquet')
-    nodes_df.to_parquet(temp_file, index=False)
-    data_conn.raw_sql(f"""
-                        CREATE OR REPLACE TABLE nodes_elevation AS 
-                        SELECT * FROM '{temp_file}'
-                        """)
-    os.remove(temp_file)
     
-    points_dem = nodes_df[['long', 'lat', 'elevation']].to_numpy()  
+    
 
     # Map node IDs to indices for the triangulation
-    id_columns = ['pg_id', 'node_id_1', 'node_id_2', 'node_id_3']
-    triangles_df = data_conn.table(element_table_name).select(id_columns).execute()
-    id_columns.remove('pg_id')
-    node_id_to_index = {node_id: idx for idx, node_id in enumerate(nodes_df['node_id'])}
-    triangles_df[id_columns] = triangles_df[id_columns].applymap(node_id_to_index.get)
-    triangles_df.dropna(inplace=True)
-    triangles_df.reset_index(inplace=True, drop=True)
-    triangles = triangles_df.drop(columns=['pg_id']).to_numpy()
+    # id_columns = ['pg_id', 'node_id_1', 'node_id_2', 'node_id_3']
+    # triangles_df = data_conn.table(element_table_name).select(id_columns).execute()
+    # id_columns.remove('pg_id')
+    # node_id_to_index = {node_id: idx for idx, node_id in enumerate(nodes_df['node_id'])}
+    # triangles_df[id_columns] = triangles_df[id_columns].applymap(node_id_to_index.get)
+    # triangles_df.dropna(inplace=True)
+    # triangles_df.reset_index(inplace=True, drop=True)
+    # triangles = triangles_df.drop(columns=['pg_id']).to_numpy()
+    
     
     # Process the triangle data in batches
     batch_size = 100000

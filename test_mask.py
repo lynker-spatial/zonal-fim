@@ -52,16 +52,22 @@ if __name__ == '__main__':
     print('Finding none overlapping nodes.')
     gm.get_none_overlapping(s3_path=s3_path, database_path=database_path, point_gdf_table='nodes')
     print('Found all none overlapping nodes. \n')
+    print('Extracting elevation for nodes ...')
+    gm.extract_elevation(s3_path=s3_path, database_path=database_path)
+    print('Elevation extraction complete.\n')
+    print('Masking elements, nodes, and DEM...')
+    mb.filter_valid_elements(data_database_path=database_path, mask_database_path=mask_database_path)
+    # These will be used from now on -> null_filtered_masked_elements,  valid_nodes_elevations
+    mb.mask_raster(mask_database_path=mask_database_path, raster_path=s3_path)
+    print('Masking complete. \n')
+
     print('Extracting elevation for nodes and calculating barycentric ...')
     bc.compute_3d_barycentric(database_path=database_path, raster_path=s3_path, node_table_name='nodes', 
                                 element_table_name='elements')
     print('Completed barycentric. \n')
-    print('Masking elements, nodes, and DEM...')
-    mb.filter_valid_elements(data_database_path=database_path, mask_database_path=mask_database_path)
-    mb.mask_raster(mask_database_path=mask_database_path, raster_path=s3_path)
-    print('Masking complete. \n')
-    print('Barycentric averaging...')
     
+    print('Barycentric averaging...')
+
     print('Completed barycentric averaging. \n')
     print('Zonal operations...')
     zo.read_zonal_outputs(database_path=database_path, zonal_output_path=zonal_path)

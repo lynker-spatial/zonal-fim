@@ -100,5 +100,8 @@ def estimate(database_path: str) -> None:
         """
     )
 
+    data_conn.con.close()
+    return 
+
 
 
