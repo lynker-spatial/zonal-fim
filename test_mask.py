@@ -5,6 +5,8 @@ from tools import mask_bounds as mb
 from tools import geometry_manipulation as gm
 from tools import read_schisim as rs
 from tools import barrycentric as bc
+from tools import zonal_operations as zo
+from code import bary_interpolation as bi
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Build general mask')
@@ -13,6 +15,7 @@ if __name__ == '__main__':
     parser.add_argument('-c','--database_path',help='Path to the DuckDB database file.',required=True,type=str)
     parser.add_argument('-a','--mask_database_path',help='Path to the mask DuckDB database file.',required=True,type=str)
     parser.add_argument('-u','--triangles_path',help='Path to the file containing the triangles dataset.',required=True,type=str)
+    parser.add_argument('-w','--zonal_path',help='Path to the zonal file containing the coverage fractions.',required=True,type=str)
     parser.add_argument('-p','--schisim_table_name',help='Name of the SCHISM table in the DuckDB database.',required=False,type=str,default='exterior_mask_schism_boundary_atlantic_buffer_atlgulf')
     parser.add_argument('-n','--state_table_name',help='Name of the state boundaries table in the DuckDB database.',required=False,type=str,default='exterior_mask_state_boundaries_conus_atlgulf')
     parser.add_argument('-x','--levee_table_name',help='Name of the levee data table in the DuckDB database.',required=False,type=str,default='interior_mask_levee_protected_area_conus_atlgulf')
@@ -27,6 +30,7 @@ if __name__ == '__main__':
     database_path = args['database_path']
     mask_database_path = args['mask_database_path']
     triangles_path = args['triangles_path']
+    zonal_path = args['zonal_path']
     schisim_table_name = args['schisim_table_name']
     state_table_name = args['state_table_name']
     levee_table_name = args['levee_table_name']
@@ -54,5 +58,12 @@ if __name__ == '__main__':
     print('Completed barycentric. \n')
     print('Masking elements, nodes, and DEM...')
     mb.filter_valid_elements(data_database_path=database_path, mask_database_path=mask_database_path)
+    mb.mask_raster(mask_database_path=mask_database_path, raster_path=s3_path)
     print('Masking complete. \n')
+    print('Barycentric averaging...')
+    
+    print('Completed barycentric averaging. \n')
+    print('Zonal operations...')
+    zo.read_zonal_outputs(database_path=database_path, zonal_output_path=zonal_path)
+    bi.interpolate(database_path=database_path)
     print('Script end.')
