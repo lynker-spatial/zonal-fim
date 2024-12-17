@@ -134,7 +134,6 @@ def compute_3d_barycentric(database_path: str, raster_path: str, node_table_name
     os.remove(temp_file)
     
     points_dem = nodes_df[['long', 'lat', 'elevation']].to_numpy()  
-    points_swe = nodes_df[['long', 'lat', 'wse']].to_numpy() 
 
     # Map node IDs to indices for the triangulation
     id_columns = ['pg_id', 'node_id_1', 'node_id_2', 'node_id_3']
@@ -159,56 +158,37 @@ def compute_3d_barycentric(database_path: str, raster_path: str, node_table_name
         batch_triangles = triangles[start_idx:end_idx]
         
         # Lists to hold results for the current batch
-        weighted_centers = []
         weights_raw = []
         
         for tri_indices in batch_triangles:
             # Get triangle vertices using the point indices
             triangle_points_dem = points_dem[tri_indices.astype(int)]
-            triangle_points_swe = points_swe[tri_indices.astype(int)]
 
             # Calculate Barycentric weights
             weights = calculate_barycentric_weights(triangle_points_dem)
             weights_raw.append(weights)
             
-            # Compute weighted center for x, y, z
-            weighted_center = np.dot(weights, triangle_points_swe) 
-            weighted_centers.append(weighted_center)
-
-        # Convert weighted centers and Z values into DataFrame for easy manipulation
-        weighted_centers_df = pd.DataFrame(weighted_centers, columns=['x', 'y', 'z'])
-
-        # Save outputs for the current batch
-        batch_output_path = os.path.join(output_folder, f'batch_{batch_num}_swe.csv')
-        weighted_centers_df.to_csv(batch_output_path, index=False,header=False)
         
         # Save raw weights as well
         weights_raw_path = os.path.join(output_folder, f'batch_{batch_num}_weights.csv')
         pd.DataFrame(weights_raw).to_csv(weights_raw_path, index=False, header=False)
 
     print("Processing completed. Outputs saved to:", output_folder)
-    del weighted_centers, weights_raw, weighted_centers_df, batch_triangles
+    del weights_raw, batch_triangles
     
     # Stich patches to a single parquet file
-    weighted_centers_list = []
     weights_raw_list = []
 
     # Read and concatenate weighted centers and raw weights from all batches
     num_batches = len(os.listdir(output_folder)) // 2 
 
     for batch_num in tqdm(range(num_batches), desc="Processing batches"):
-        # Read weighted centers
-        weighted_centers_path = os.path.join(output_folder, f'batch_{batch_num}_swe.csv')
-        weighted_centers_df = pd.read_csv(weighted_centers_path, header=None)
-        weighted_centers_list.append(weighted_centers_df)
-        
         # Read raw weights
         weights_raw_path = os.path.join(output_folder, f'batch_{batch_num}_weights.csv')
         weights_raw_df = pd.read_csv(weights_raw_path, header=None) 
         weights_raw_list.append(weights_raw_df)
 
-    # Step 3: Concatenate all batches into single DataFrames
-    final_weighted_centers = pd.concat(weighted_centers_list, ignore_index=True)
+    # Concatenate all batches into single DataFrames
     final_weights_raw = pd.concat(weights_raw_list, ignore_index=True)
 
 
@@ -217,11 +197,7 @@ def compute_3d_barycentric(database_path: str, raster_path: str, node_table_name
     # Assign the new column names to the DataFrame
     final_weights_raw.columns = new_column_names
 
-    new_column_names = ['centroid_long', 'centroid_lat', 'swe_weighted_average']
-    # Assign the new column names to the DataFrame
-    final_weighted_centers.columns = new_column_names
-
-    elements_df_combined = pd.concat([triangles_df, final_weights_raw, final_weighted_centers], axis=1)
+    elements_df_combined = pd.concat([triangles_df, final_weights_raw], axis=1)
     
     # Merge with triangles
     output_path = os.path.join(output_folder, 'bary_centroids.parquet')
