@@ -136,6 +136,7 @@ def extract_elevation(s3_path: str, database_path: str) -> gpd.GeoDataFrame([]):
         data_conn.raw_sql('INSTALL spatial')
         data_conn.raw_sql('LOAD spatial')
     point_gdf = data_conn.table("nodes").execute()
+    point_gdf = point_gdf.set_crs('EPSG:4326')
 
     with COGReader(s3_path) as cog:
         raster_crs = cog.dataset.crs
@@ -163,7 +164,8 @@ def extract_elevation(s3_path: str, database_path: str) -> gpd.GeoDataFrame([]):
     # Add the extracted raster values to the Ibis DuckDB table
     point_gdf["elevation"] = values
     # Transform back to the 4326 and save
-    point_gdf.to_crs('EPSG:4326')
+    if points_crs.crs.to_string() != 'EPSG:4326':
+        point_gdf = point_gdf.to_crs('EPSG:4326')
     directory = 'temp'
     if not os.path.exists(directory):
         os.makedirs(directory)
