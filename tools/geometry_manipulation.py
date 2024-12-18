@@ -164,7 +164,7 @@ def extract_elevation(s3_path: str, database_path: str) -> gpd.GeoDataFrame([]):
     # Add the extracted raster values to the Ibis DuckDB table
     point_gdf["elevation"] = values
     # Transform back to the 4326 and save
-    if points_crs.crs.to_string() != 'EPSG:4326':
+    if point_gdf.crs.to_string() != 'EPSG:4326':
         point_gdf = point_gdf.to_crs('EPSG:4326')
     directory = 'temp'
     if not os.path.exists(directory):
