@@ -126,27 +126,33 @@ def create_general_mask(database_path: str, triangles_path: str,
         os.makedirs(directory)
     temp_file = os.path.join(directory, 'mask.parquet')
     step_5.to_parquet(temp_file, index=False)
-    mask_conn.raw_sql(f"""
-                        CREATE OR REPLACE TABLE step_5 AS 
-                        SELECT * FROM '{temp_file}'
-                        """)
-    mask_conn.raw_sql(f"""
-                        CREATE OR REPLACE TABLE triangles AS 
-                        SELECT * FROM '{triangles_path}'
-                        """)
+    mask_conn.raw_sql(
+        f"""
+        CREATE OR REPLACE TABLE step_5 AS 
+        SELECT * FROM '{temp_file}'
+        """
+    )
+    mask_conn.raw_sql(
+        f"""
+        CREATE OR REPLACE TABLE triangles AS 
+        SELECT * FROM '{triangles_path}'
+        """
+    )
     
     # Mask triangles that are fully overlap with costal mask
-    mask_conn.raw_sql("""
-                        CREATE OR REPLACE TABLE triangles_masked AS
-                        SELECT 
-                            t.* -- Keep pg_id from the table
-                        FROM 
-                            triangles AS t, step_5 AS s
-                        WHERE 
-                            ST_Intersects(t.geometry, s.geometry) -- Keep triangles that intersect
-                            AND NOT ST_Within(t.geometry, s.geometry) -- Exclude those completely within step_5
-                            OR NOT ST_Intersects(t.geometry, s.geometry); -- Keep triangles that do not intersect at all
-                        """)
+    mask_conn.raw_sql(
+        """
+        CREATE OR REPLACE TABLE triangles_masked AS
+        SELECT 
+            t.* -- Keep pg_id from the table
+        FROM 
+            triangles AS t, step_5 AS s
+        WHERE 
+            ST_Intersects(t.geometry, s.geometry) -- Keep triangles that intersect
+            AND NOT ST_Within(t.geometry, s.geometry) -- Exclude those completely within step_5
+            OR NOT ST_Intersects(t.geometry, s.geometry); -- Keep triangles that do not intersect at all
+        """
+    )
     # Cleanup
     print('Completed masking.')
     os.remove(temp_file)
@@ -166,7 +172,8 @@ def filter_valid_elements(data_database_path: str, mask_database_path: str) -> N
 
     # Create A new table for masked elements
     data_conn.raw_sql(
-        """ CREATE OR REPLACE TABLE masked_elements AS 
+        """ 
+        CREATE OR REPLACE TABLE masked_elements AS 
         SELECT el.* 
         FROM elements AS el
         INNER JOIN mask_db.triangles_masked as m
@@ -175,31 +182,32 @@ def filter_valid_elements(data_database_path: str, mask_database_path: str) -> N
     )
     # Also filter for null values in elevation (points outside domain)
     data_conn.raw_sql(
-    """ 
-    CREATE OR REPLACE TABLE null_filtered_masked_elements AS
-    SELECT *
-    FROM masked_elements AS me
-    WHERE node_id_1 NOT IN (SELECT node_id FROM nodes_elevation WHERE elevation IS NULL) 
-        AND node_id_2 NOT IN (SELECT node_id FROM nodes_elevation WHERE elevation IS NULL) 
-        AND node_id_3 NOT IN (SELECT node_id FROM nodes_elevation WHERE elevation IS NULL);
-    """
+        """ 
+        CREATE OR REPLACE TABLE null_filtered_masked_elements AS
+        SELECT *
+        FROM masked_elements AS me
+        WHERE node_id_1 NOT IN (SELECT node_id FROM nodes_elevation WHERE elevation IS NULL) 
+            AND node_id_2 NOT IN (SELECT node_id FROM nodes_elevation WHERE elevation IS NULL) 
+            AND node_id_3 NOT IN (SELECT node_id FROM nodes_elevation WHERE elevation IS NULL);
+        """
     )
 
     # Filter to all valid nodes (nodes with elevation and associated with masked elements)
     data_conn.raw_sql(
-    """
-    CREATE OR REPLACE TABLE valid_nodes_elevations AS
-    SELECT *
-    FROM nodes_elevation AS ne
-    WHERE elevation IS NOT NULL
-    AND node_id IN (
-        SELECT node_id_1 FROM null_filtered_masked_elements
-        UNION
-        SELECT node_id_2 FROM null_filtered_masked_elements
-        UNION
-        SELECT node_id_3 FROM null_filtered_masked_elements
-    );
-    """)
+        """
+        CREATE OR REPLACE TABLE valid_nodes_elevations AS
+        SELECT *
+        FROM nodes_elevation AS ne
+        WHERE elevation IS NOT NULL
+        AND node_id IN (
+            SELECT node_id_1 FROM null_filtered_masked_elements
+            UNION
+            SELECT node_id_2 FROM null_filtered_masked_elements
+            UNION
+            SELECT node_id_3 FROM null_filtered_masked_elements
+        );
+        """
+    )
     data_conn.con.close()
     return
 
@@ -232,4 +240,28 @@ def mask_raster(mask_database_path: str, raster_path: str) -> None:
     # Save masked DEM
     with rasterio.open("data/DEM_masked_4326.tif", 'w', **out_meta) as dest:
         dest.write(out_image)
+    mask_conn.con.close()
+    return
+
+def filter_nodes(database_path: str) -> None:
+    data_conn = ibis.duckdb.connect(database_path)
+    try:
+        data_conn.raw_sql('LOAD spatial')
+    except: 
+        data_conn.raw_sql('INSTALL spatial')
+        data_conn.raw_sql('LOAD spatial')
+
+    data_conn.raw_sql(
+        """
+        CREATE OR REPLACE TABLE nodes AS
+        SELECT *
+        FROM nodes
+        WHERE node_id IN (
+            SELECT node_id
+            FROM valid_nodes_elevations
+        );
+        """
+    )
+
+    data_conn.con.close()
     return

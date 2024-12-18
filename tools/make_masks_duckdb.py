@@ -69,16 +69,20 @@ def make_masks_duckdb(zip_folder_path: str, duckdb_path: str) -> None:
                 print(f"Error processing {zip_path}: {e}")
     
     # Save crs info
-    mask_conn.raw_sql("""
-    CREATE TABLE IF NOT EXISTS metadata (
-        table_name STRING,
-        crs STRING
+    mask_conn.raw_sql( 
+        """
+        CREATE TABLE IF NOT EXISTS metadata (
+            table_name STRING,
+            crs STRING
         )
-    """)
-    mask_conn.raw_sql("""
+        """
+    )
+    mask_conn.raw_sql(
+        """
         INSERT INTO metadata (table_name, crs)
         VALUES ('masks', 'EPSG:4326')
-    """)
+        """
+    )
 
     # Cleanup the temporary folder
     shutil.rmtree(extraction_path, ignore_errors=True)
