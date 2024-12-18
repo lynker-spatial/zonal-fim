@@ -125,12 +125,48 @@ def compute_3d_barycentric(database_path: str, raster_path: str, node_table_name
     nodes_df = data_conn.table(node_table_name).execute()
     nodes_df = nodes_df.set_crs(epsg='4326')
     points_dem = nodes_df[['long', 'lat', 'elevation']].to_numpy()  
-    
+
     output_folder = 'temp'  
     os.makedirs(output_folder, exist_ok=True)
     
-    
+    # Mapping polygons to nodes 
+    data_conn.raw_sql(
+        f"""
+        -- Add idx mapping to nodes and save it
+        CREATE OR REPLACE TABLE node_element_crosswalk AS
+        SELECT 
+            node_id,
+            ROW_NUMBER() OVER () - 1 AS idx
+        FROM {node_table_name};
 
+        -- Map elements (triangles) to node indices using idx
+        CREATE OR REPLACE TABLE indexed_triangles AS
+        SELECT
+            el.pg_id,
+            n1.idx AS node_id_1,
+            n2.idx AS node_id_2,
+            n3.idx AS node_id_3
+        FROM {element_table_name} el
+        LEFT JOIN node_element_crosswalk n1 ON el.node_id_1 = n1.node_id
+        LEFT JOIN node_element_crosswalk n2 ON el.node_id_2 = n2.node_id
+        LEFT JOIN node_element_crosswalk n3 ON el.node_id_3 = n3.node_id
+        WHERE n1.idx IS NOT NULL AND n2.idx IS NOT NULL AND n3.idx IS NOT NULL;
+
+        -- Restore original node IDs for indexed triangles
+        CREATE OR REPLACE TABLE original_triangles AS
+        SELECT
+            it.pg_id,
+            n1.node_id AS node_id_1,
+            n2.node_id AS node_id_2,
+            n3.node_id AS node_id_3
+        FROM indexed_triangles it
+        LEFT JOIN node_element_crosswalk n1 ON it.node_id_1 = n1.idx
+        LEFT JOIN node_element_crosswalk n2 ON it.node_id_2 = n2.idx
+        LEFT JOIN node_element_crosswalk n3 ON it.node_id_3 = n3.idx;
+        """
+    )
+    triangles_df = data_conn.table('indexed_triangles').execute()
+    triangles = triangles_df[['node_id_1', 'node_id_2', 'node_id_3']].to_numpy()
     # Map node IDs to indices for the triangulation
     # id_columns = ['pg_id', 'node_id_1', 'node_id_2', 'node_id_3']
     # triangles_df = data_conn.table(element_table_name).select(id_columns).execute()
@@ -197,41 +233,49 @@ def compute_3d_barycentric(database_path: str, raster_path: str, node_table_name
     elements_df_combined = pd.concat([triangles_df, final_weights_raw], axis=1)
     
     # Merge with triangles
-    output_path = os.path.join(output_folder, 'bary_centroids.parquet')
+    output_path = os.path.join(output_folder, 'bary_weights.parquet')
     elements_df_combined.to_parquet(output_path, index=False)
-    data_conn.raw_sql(f"""
-    CREATE OR REPLACE TABLE triangles AS
-    SELECT * FROM '{output_path}'
-    """)
+    data_conn.raw_sql(
+        f"""
+        CREATE OR REPLACE TABLE bary_weights AS
+        SELECT * FROM '{output_path}'
+        """
+    )
     
-    data_conn.raw_sql("""
-    CREATE OR REPLACE TABLE triangle_elements AS
-    SELECT
-            el.*,
-            tr.* EXCLUDE (pg_id)
-    FROM 
-        elements AS el
-    LEFT JOIN
-        triangles AS tr
-    ON
-        el.pg_id = tr.pg_id;
-    """)
+    data_conn.raw_sql(
+        """
+        CREATE OR REPLACE TABLE triangle_weights AS
+        SELECT
+                el.*,
+                bw.* EXCLUDE (pg_id)
+        FROM 
+            elements AS el
+        LEFT JOIN
+            bary_weights AS bw
+        ON
+            el.pg_id = bw.pg_id;
+        """
+    )
 
     # Save crs info
-    data_conn.raw_sql("""
-    CREATE TABLE IF NOT EXISTS metadata (
-        table_name STRING,
-        crs STRING
+    data_conn.raw_sql(
+        """
+        CREATE TABLE IF NOT EXISTS metadata (
+            table_name STRING,
+            crs STRING
         )
-    """)
-    data_conn.raw_sql("""
+        """
+    )
+    data_conn.raw_sql(
+        """
         INSERT INTO metadata (table_name, crs)
-        VALUES ('triangles', 'EPSG:4326'),
-        VALUES ('triangle_elements', 'EPSG:4326')              
-    """)
+        VALUES ('bary_weights', 'EPSG:4326'),
+        VALUES ('triangle_weights', 'EPSG:4326')              
+        """
+    )
 
     # Look for any problems
-    triangle_elements = data_conn.table('triangle_elements')
+    triangle_elements = data_conn.table('triangle_weights')
     nan_counts = triangle_elements.aggregate(
         **{
             column: triangle_elements[column].isnull().sum().name(f"{column}_nan_count")
@@ -245,7 +289,7 @@ def compute_3d_barycentric(database_path: str, raster_path: str, node_table_name
         print(nan_counts_result)
     
     # Save for R
-    triangle_elements = data_conn.table('triangle_elements').execute()
+    triangle_elements = data_conn.table('triangle_weights').execute()
     triangle_elements = triangle_elements.set_crs(epsg=4326)
     print("Saving to gpkg for R ...")
     triangle_elements.to_file("data/bary_triangles.gpkg", layer="triangles", driver="GPKG")

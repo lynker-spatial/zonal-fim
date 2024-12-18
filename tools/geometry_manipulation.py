@@ -4,6 +4,7 @@ import ibis
 from ibis import _
 import rasterio
 from rasterio.features import shapes
+import pandas as pd
 import geopandas as gpd
 from shapely.geometry import shape
 from rasterio.session import AWSSession
@@ -18,14 +19,16 @@ import os
 def add_point_geo(database_path: str, table_name: str, lat_col_nam: str, long_col_name: str):
     data_conn = ibis.duckdb.connect(database_path)
     data_conn.raw_sql('LOAD spatial')
-    data_conn.raw_sql(f""" 
-    ALTER TABLE {table_name} ADD COLUMN geometry GEOMETRY; 
-    UPDATE {table_name} SET geometry = ST_Point({long_col_name}, {lat_col_nam}); 
-    """)
+    data_conn.raw_sql(
+        f""" 
+        ALTER TABLE {table_name} ADD COLUMN geometry GEOMETRY; 
+        UPDATE {table_name} SET geometry = ST_Point({long_col_name}, {lat_col_nam}); 
+        """
+    )
     data_conn.con.close()
     return
 
-def write_to_database(database_path: str, table_name:str, df) -> None:
+def write_to_database(database_path: str, table_name: str, df: pd.DataFrame([])) -> None:
     data_conn = ibis.duckdb.connect(database_path)
     data_conn.raw_sql('LOAD spatial')
     
@@ -36,10 +39,12 @@ def write_to_database(database_path: str, table_name:str, df) -> None:
     df.to_parquet(df_temp_file, index=False)
     del df
 
-    data_conn.raw_sql(f"""
-    CREATE OR REPLACE TABLE {table_name} AS
-    SELECT * FROM '{df_temp_file}'
-    """)
+    data_conn.raw_sql(
+        f"""
+        CREATE OR REPLACE TABLE {table_name} AS
+        SELECT * FROM '{df_temp_file}'
+        """
+    )
     os.remove(df_temp_file)
     os.rmdir(directory)
     data_conn.con.close()
@@ -77,40 +82,48 @@ def get_none_overlapping(s3_path: str, database_path: str, point_gdf_table: str)
     raster_gdf.to_parquet(raster_temp_file, index=False)
     points_gdf.to_parquet(point_temp_file, index=False)
 
-    data_conn.raw_sql(f"""
-    CREATE OR REPLACE TABLE dem_bounds AS
-    SELECT * FROM '{raster_temp_file}';
-    CREATE OR REPLACE TABLE transformed_nodes AS
-    SELECT * FROM '{point_temp_file}';
-    """)
+    data_conn.raw_sql(
+        f"""
+        CREATE OR REPLACE TABLE dem_bounds AS
+        SELECT * FROM '{raster_temp_file}';
+        CREATE OR REPLACE TABLE transformed_nodes AS
+        SELECT * FROM '{point_temp_file}';
+        """
+    )
     os.remove(raster_temp_file)
     os.remove(point_temp_file)
     os.rmdir(directory)
 
     # Find all that fall outside
-    data_conn.raw_sql(f"""
-    CREATE OR REPLACE TABLE points_outside_dem AS
-    SELECT tn.*
-    FROM transformed_nodes AS tn
-    LEFT JOIN dem_bounds AS db
-    ON ST_Intersects(tn.geometry, db.geometry)
-    WHERE db.geometry IS NULL;
-    """)
+    data_conn.raw_sql(
+        """
+        CREATE OR REPLACE TABLE points_outside_dem AS
+        SELECT tn.*
+        FROM transformed_nodes AS tn
+        LEFT JOIN dem_bounds AS db
+        ON ST_Intersects(tn.geometry, db.geometry)
+        WHERE db.geometry IS NULL;
+        """
+    )
 
     # Save crs info
-    data_conn.raw_sql("""
-    CREATE TABLE IF NOT EXISTS metadata (
-        table_name STRING,
-        crs STRING
+    data_conn.raw_sql(
+        """
+        CREATE TABLE IF NOT EXISTS metadata (
+            table_name STRING,
+            crs STRING
         )
-    """)
-    data_conn.raw_sql(f"""
+        """
+    )
+    data_conn.raw_sql(
+        f"""
         INSERT INTO metadata (table_name, crs)
         VALUES 
             ('points_outside_dem', '{raster_gdf.crs.to_string()}'),
             ('dem_bounds', '{raster_gdf.crs.to_string()}'),
             ('transformed_nodes', '{raster_gdf.crs.to_string()}');
-    """)
+        """
+    )
     data_conn.con.close()
     return 
 
