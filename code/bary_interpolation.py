@@ -102,14 +102,7 @@ def make_depth_raster(dem_path: str, wse_path: str = "data/wse_barycentric_inter
     with rasterio.open(wse_path) as src1:
         wse_values = src1.read(1)  # Read the first band of raster1
         raster1_transform = src1.transform
-        raster1_crs = src1.crs
         raster1_nodata = src1.nodata
-        raster1_bounds = src1.bounds
-        raster1_shape = src1.shape
-        raster1_extent = (
-            src1.bounds.left, src1.bounds.right, 
-            src1.bounds.bottom, src1.bounds.top
-        )
 
         # Open the larger raster (raster2) and align it to the extent of raster1
         with rasterio.open(dem_path) as src2:
@@ -126,13 +119,10 @@ def make_depth_raster(dem_path: str, wse_path: str = "data/wse_barycentric_inter
             
             # Read the data from raster2 using the window
             dem_values = src2.read(1, window=window, out_shape=wse_values.shape)
-            raster2_transform = src2.window_transform(window)
             raster2_nodata = src2.nodata
 
         # Calculate the difference
         difference = wse_values - dem_values
-        # difference[difference<0.0] = 0.0
-        # difference[difference == np.float32(-3.4028235e+38)] = 0
 
         # Handle NoData values (optional, depends on your data)
         nodata_value = raster1_nodata if raster1_nodata is not None else raster2_nodata
@@ -146,3 +136,4 @@ def make_depth_raster(dem_path: str, wse_path: str = "data/wse_barycentric_inter
         profile.update(dtype=rasterio.float32, transform=raster1_transform)
         with rasterio.open("data/depth_barycentric_interpolation.tif", 'w', **profile) as dst:
             dst.write(difference.astype(rasterio.float32), 1)
+    return

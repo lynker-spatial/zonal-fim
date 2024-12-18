@@ -1,6 +1,7 @@
 # test_mask.py
 
 import argparse
+import time
 from tools import mask_bounds as mb
 from tools import geometry_manipulation as gm
 from tools import read_schisim as rs
@@ -39,16 +40,20 @@ if __name__ == '__main__':
     water_table_name = args['water_table_name']
     dissolve = args['dissolve']
 
-    print('Creating single mask ...')
-    mb.create_general_mask(database_path=mask_database_path, triangles_path=triangles_path, 
-                           schisim_table_name=schisim_table_name, state_table_name=state_table_name, 
-                           levee_table_name=levee_table_name, nwm_table_name=nwm_table_name, 
-                           water_table_name=water_table_name, dissolve=dissolve) 
-    print('Masking complete. \n')
+    # print('Creating single mask ...')
+    # mb.create_general_mask(database_path=mask_database_path, triangles_path=triangles_path, 
+    #                        schisim_table_name=schisim_table_name, state_table_name=state_table_name, 
+    #                        levee_table_name=levee_table_name, nwm_table_name=nwm_table_name, 
+    #                        water_table_name=water_table_name, dissolve=dissolve) 
+    # print('Masking complete. \n')
     print('Reading gr3 file.')
+    start_section_1 = time.time()
     point_df, _, _ = rs.read_gr3(file_path) # -- needs to run many times
     gm.write_to_database(database_path, 'nodes', point_df) # -- needs to run many times
     gm.add_point_geo(database_path, 'nodes', 'lat', 'long') # -- needs to run many times --- maybe needed
+    end_section_1 = time.time()
+    time_section_1 = end_section_1 - start_section_1
+    print(f"Time taken for section 1: {time_section_1:.2f} seconds")
     print('gr3 reading process complete. \n')
     print('Finding none overlapping nodes.')
     gm.get_none_overlapping(s3_path=s3_path, database_path=database_path, point_gdf_table='nodes')
@@ -70,11 +75,26 @@ if __name__ == '__main__':
 
 
     print('Barycentric interpolation...')
+    start_section_2 = time.time()
     mb.filter_nodes(database_path=database_path) # -- needs to run many times
     be.estimate(database_path=database_path)                  # -- needs to run many times
+    end_section_2 = time.time()
+    time_section_2 = end_section_2 - start_section_2
+    print(f"Time taken for section 2: {time_section_2:.2f} seconds")
     # output triangle_barycentric
     print('Completed barycentric interpolation. \n')
-    print('Zonal operations...')
-    zo.read_zonal_outputs(database_path=database_path, zonal_output_path=zonal_path)
-    bi.interpolate(database_path=database_path, s3_path=s3_path)
+
+    # print('Zonal operations...')
+    # zo.read_zonal_outputs(database_path=database_path, zonal_output_path=zonal_path)
+    # bi.interpolate(database_path=database_path, s3_path=s3_path)
+    # bi.make_depth_raster(dem_path="data/DEM_masked_4326.tif")
+    total_time = time_section_1 + time_section_2
+    total_hours = int(total_time // 3600)
+    total_minutes = int((total_time % 3600) // 60)
+    total_seconds = total_time % 60
+
+    # Print total time in hours, minutes, and seconds
+    print(f"Total time taken: {total_hours} hours, {total_minutes} minutes, {total_seconds:.2f} seconds")
     print('Script end.')
+
+    

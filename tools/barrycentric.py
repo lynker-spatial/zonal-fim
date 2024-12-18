@@ -14,6 +14,7 @@ import os
 import shutil
 
 
+
 # def extract_elevation(raster_path: str, points_df: gpd.GeoDataFrame()) -> gpd.GeoDataFrame():
 #     with COGReader(raster_path) as cog:
 #         # Fix crs mismatches
