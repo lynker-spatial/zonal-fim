@@ -157,17 +157,21 @@ def create_general_mask(database_path: str, triangles_path: str,
 def filter_valid_elements(data_database_path: str, mask_database_path: str) -> None:
 
     data_conn = ibis.duckdb.connect(data_database_path)
-    data_conn.raw_sql('LOAD spatial')
+    try:
+        data_conn.raw_sql('LOAD spatial')
+    except: 
+        data_conn.raw_sql('INSTALL spatial')
+        data_conn.raw_sql('LOAD spatial')
     data_conn.raw_sql(f"ATTACH '{mask_database_path}' AS mask_db;")
 
     # Create A new table for masked elements
     data_conn.raw_sql(
-    """ CREATE OR REPLACE TABLE masked_elements AS 
-    SELECT el.* 
-    FROM elements AS el
-    INNER JOIN mask_db.triangles_masked as m
-    ON el.pg_id = m.pg_id;
-    """
+        """ CREATE OR REPLACE TABLE masked_elements AS 
+        SELECT el.* 
+        FROM elements AS el
+        INNER JOIN mask_db.triangles_masked as m
+        ON el.pg_id = m.pg_id;
+        """
     )
     # Also filter for null values in elevation (points outside domain)
     data_conn.raw_sql(

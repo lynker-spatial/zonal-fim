@@ -117,7 +117,11 @@ def get_none_overlapping(s3_path: str, database_path: str, point_gdf_table: str)
 def extract_elevation(s3_path: str, database_path: str) -> gpd.GeoDataFrame([]):
 
     data_conn = ibis.duckdb.connect(database_path)
-    data_conn.raw_sql('LOAD spatial')
+    try:
+        data_conn.raw_sql('LOAD spatial')
+    except: 
+        data_conn.raw_sql('INSTALL spatial')
+        data_conn.raw_sql('LOAD spatial')
     point_gdf = data_conn.table("nodes").execute()
 
     with COGReader(s3_path) as cog:
