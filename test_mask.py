@@ -76,5 +76,5 @@ if __name__ == '__main__':
     print('Completed barycentric interpolation. \n')
     print('Zonal operations...')
     zo.read_zonal_outputs(database_path=database_path, zonal_output_path=zonal_path)
-    bi.interpolate(database_path=database_path)
+    bi.interpolate(database_path=database_path, s3_path=s3_path)
     print('Script end.')

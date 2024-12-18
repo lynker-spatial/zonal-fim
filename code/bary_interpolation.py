@@ -91,8 +91,58 @@ def interpolate(database_path: str, s3_path: str) -> None:
         'compress': 'deflate',   
     })
 
-    output_path = "data/barycentric_interpolation.tif"
+    output_path = "data/wse_barycentric_interpolation.tif"
     with rasterio.open(output_path, 'w', **raster_meta) as dst:
         dst.write(raster_array.astype('float32'), 1)
     data_conn.con.close()
     return
+
+def make_depth_raster(dem_path: str, wse_path: str = "data/wse_barycentric_interpolation.tif", 
+                      mask_negative: bool = True) -> None:
+    with rasterio.open(wse_path) as src1:
+        wse_values = src1.read(1)  # Read the first band of raster1
+        raster1_transform = src1.transform
+        raster1_crs = src1.crs
+        raster1_nodata = src1.nodata
+        raster1_bounds = src1.bounds
+        raster1_shape = src1.shape
+        raster1_extent = (
+            src1.bounds.left, src1.bounds.right, 
+            src1.bounds.bottom, src1.bounds.top
+        )
+
+        # Open the larger raster (raster2) and align it to the extent of raster1
+        with rasterio.open(dem_path) as src2:
+            # Ensure both rasters have the same CRS
+            if src1.crs != src2.crs:
+                print(src1.crs)
+                print(src2.crs)
+                raise ValueError("The CRS of both rasters must match.")
+            
+            # Window of raster2 to match raster1
+            window = rasterio.windows.from_bounds(
+                *src1.bounds, transform=src2.transform
+            )
+            
+            # Read the data from raster2 using the window
+            dem_values = src2.read(1, window=window, out_shape=wse_values.shape)
+            raster2_transform = src2.window_transform(window)
+            raster2_nodata = src2.nodata
+
+        # Calculate the difference
+        difference = wse_values - dem_values
+        # difference[difference<0.0] = 0.0
+        # difference[difference == np.float32(-3.4028235e+38)] = 0
+
+        # Handle NoData values (optional, depends on your data)
+        nodata_value = raster1_nodata if raster1_nodata is not None else raster2_nodata
+        if nodata_value is not None:
+            difference[(wse_values == nodata_value) | (dem_values == nodata_value)] = np.nan
+            
+        if mask_negative:
+            difference[difference<=0.0] = np.nan
+        # Save the result as a new raster file
+        profile = src1.profile
+        profile.update(dtype=rasterio.float32, transform=raster1_transform)
+        with rasterio.open("data/depth_barycentric_interpolation.tif", 'w', **profile) as dst:
+            dst.write(difference.astype(rasterio.float32), 1)
