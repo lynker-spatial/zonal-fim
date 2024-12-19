@@ -39,6 +39,6 @@ conda activate "$ENV_NAME"
 
 # Install the package in the activated environment
 echo "Installing the package..."
-pip install .
+python -m pip install . # -e .
 
 echo "Setup completed successfully!"
