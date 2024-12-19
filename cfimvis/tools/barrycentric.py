@@ -248,13 +248,24 @@ def compute_3d_barycentric(database_path: str, mask_database_path: str, node_tab
         CREATE OR REPLACE TABLE triangle_weights AS
         SELECT
                 el.*,
-                bw.* EXCLUDE (pg_id)
+                bw.* EXCLUDE (pg_id, node_id1, node_id2, node_id3)
         FROM 
             elements AS el
         LEFT JOIN
             bary_weights AS bw
         ON
             el.pg_id = bw.pg_id;
+        -- Update original triangles
+        CREATE OR REPLACE TABLE original_triangles AS
+        SELECT
+                ot.*,
+                bw.node1_weight, bw.node2_weight, bw.node3_weight
+        FROM 
+            original_triangles AS ot
+        LEFT JOIN
+            bary_weights AS bw
+        ON
+            ot.pg_id = bw.pg_id;
         """
     )
 

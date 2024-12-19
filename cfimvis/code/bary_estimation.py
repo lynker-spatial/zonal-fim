@@ -95,7 +95,7 @@ def estimate(database_path: str) -> None:
             wc.centroid_lat,
             wc.wse_weighted_average
         FROM original_triangles t
-        JOIN weighted_centroids wc ON t.pg_id = wc.pg_id;
+        LEFT JOIN weighted_centroids wc ON t.pg_id = wc.pg_id;
         """
     )
 
