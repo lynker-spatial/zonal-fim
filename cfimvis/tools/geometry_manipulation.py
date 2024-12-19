@@ -171,10 +171,12 @@ def extract_elevation(s3_path: str, database_path: str) -> gpd.GeoDataFrame([]):
         os.makedirs(directory)
     temp_file = os.path.join(directory, 'elevation.parquet')
     point_gdf.to_parquet(temp_file, index=False)
-    data_conn.raw_sql(f"""
-                        CREATE OR REPLACE TABLE nodes_elevation AS 
-                        SELECT * FROM '{temp_file}'
-                        """)
+    data_conn.raw_sql(
+        f"""
+        CREATE OR REPLACE TABLE nodes_elevation AS 
+        SELECT * FROM '{temp_file}'
+        """
+    )
     os.remove(temp_file)
     os.rmdir(directory)
     data_conn.con.close()

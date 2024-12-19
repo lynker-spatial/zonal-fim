@@ -114,7 +114,7 @@ def calculate_barycentric_weights(triangle_points: np.ndarray) -> np.ndarray:
     weights_3d = np.array([weight_A, weight_B, weight_C])
     return weights_3d
 
-def compute_3d_barycentric(database_path: str, raster_path: str, node_table_name: str, 
+def compute_3d_barycentric(database_path: str, mask_database_path: str, node_table_name: str, 
                            element_table_name: str) -> None:
     
     data_conn = ibis.duckdb.connect(database_path)
@@ -239,7 +239,7 @@ def compute_3d_barycentric(database_path: str, raster_path: str, node_table_name
     data_conn.raw_sql(
         f"""
         CREATE OR REPLACE TABLE bary_weights AS
-        SELECT * FROM '{output_path}'
+        SELECT * FROM '{output_path}';
         """
     )
     
@@ -248,13 +248,24 @@ def compute_3d_barycentric(database_path: str, raster_path: str, node_table_name
         CREATE OR REPLACE TABLE triangle_weights AS
         SELECT
                 el.*,
-                bw.* EXCLUDE (pg_id)
+                bw.* EXCLUDE (pg_id, node_id1, node_id2, node_id3)
         FROM 
             elements AS el
         LEFT JOIN
             bary_weights AS bw
         ON
             el.pg_id = bw.pg_id;
+        -- Update original triangles
+        CREATE OR REPLACE TABLE original_triangles AS
+        SELECT
+                ot.*,
+                bw.node1_weight, bw.node2_weight, bw.node3_weight
+        FROM 
+            original_triangles AS ot
+        LEFT JOIN
+            bary_weights AS bw
+        ON
+            ot.pg_id = bw.pg_id;
         """
     )
 
@@ -264,14 +275,29 @@ def compute_3d_barycentric(database_path: str, raster_path: str, node_table_name
         CREATE TABLE IF NOT EXISTS metadata (
             table_name STRING,
             crs STRING
-        )
+        );
         """
     )
     data_conn.raw_sql(
         """
         INSERT INTO metadata (table_name, crs)
-        VALUES ('bary_weights', 'EPSG:4326'),
-        VALUES ('triangle_weights', 'EPSG:4326')              
+        VALUES 
+            ('bary_weights', 'EPSG:4326'),
+            ('triangle_weights', 'EPSG:4326');             
+        """
+    )
+
+    # Add geometry back
+    data_conn.raw_sql(f"ATTACH '{mask_database_path}' AS mask_db;")
+
+    # Create A new table for masked elements <---- we can keep geometry form the start to avoid this something to fix later on
+    data_conn.raw_sql(
+        """ 
+        ALTER TABLE triangle_weights ADD COLUMN geometry GEOMETRY;
+        UPDATE triangle_weights
+        SET geometry = mask_db.triangles.geometry
+        FROM mask_db.triangles
+        WHERE triangle_weights.pg_id = mask_db.triangles.pg_id;
         """
     )
 

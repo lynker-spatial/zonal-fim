@@ -1,3 +1,5 @@
+# setup.py
+import setuptools
 from setuptools import setup, find_packages
 
 # Read the README file
@@ -5,7 +7,7 @@ with open("README.md", "r", encoding="utf-8") as f:
     long_description = f.read()
 
 setup(
-    name="coastal_fim_vis",  
+    name="cfimvis",  
     version="0.1.0",  
     author="Arash Modaresi Rad",
     author_email="arash.mod.rad@noaa.gov",
@@ -20,7 +22,7 @@ setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    python_requires='>=3.9',  
+    python_requires='>=3.12.1',  
     install_requires=[],  
     extras_require={
         # Optional dependencies 

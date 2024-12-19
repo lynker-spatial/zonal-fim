@@ -81,7 +81,7 @@ def read_gr3(file_path: str) -> Tuple[pd.DataFrame, pd.DataFrame, List[List[str]
     --------
     >>> nodes_df, elements_df, extra_lines = read_gr3("example.gr3")
     >>> print(nodes_df)
-       id  long  lat  wse
+       node_id  long  lat  wse
     0   1   0.0  0.0  1.0
     1   2   1.0  0.0  2.0
     2   3   0.0  1.0  3.0
@@ -121,7 +121,7 @@ def read_gr3(file_path: str) -> Tuple[pd.DataFrame, pd.DataFrame, List[List[str]
         for line in node_lines:
             node_id = int(line[0])
             x, y, depth = map(float, line[1:4])
-            nodes.append({"id": node_id, "long": x, "lat": y, "wse": depth})
+            nodes.append({"node_id": node_id, "long": x, "lat": y, "wse": depth})
 
         # Process element data
         for line in element_lines:

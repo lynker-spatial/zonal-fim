@@ -76,8 +76,7 @@ def estimate(database_path: str) -> None:
         FROM original_triangles t
         JOIN nodes_data n1 ON t.node_id_1 = n1.node_id 
         JOIN nodes_data n2 ON t.node_id_2 = n2.node_id 
-        JOIN nodes_data n3 ON t.node_id_3 = n3.node_id 
-        ),
+        JOIN nodes_data n3 ON t.node_id_3 = n3.node_id; 
 
         -- Compute weighted centroids
         CREATE OR REPLACE TEMP TABLE weighted_centroids AS 
@@ -96,7 +95,7 @@ def estimate(database_path: str) -> None:
             wc.centroid_lat,
             wc.wse_weighted_average
         FROM original_triangles t
-        JOIN weighted_centroids wc ON t.pg_id = wc.pg_id;
+        LEFT JOIN weighted_centroids wc ON t.pg_id = wc.pg_id;
         """
     )
 
