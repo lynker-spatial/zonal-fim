@@ -1,6 +1,8 @@
 # tools/read_schisim.py
 import pandas as pd
 import geopandas as gpd
+import numpy as np
+from concurrent.futures import ThreadPoolExecutor
 from typing import List, Tuple
 
 # ----------------- Read 2dm file
@@ -59,6 +61,14 @@ def read_2dm(file_path: str) -> Tuple[List[List[float]], List[List[int]], pd.Dat
     return node_data, element_data, nodes_df, elements_df
 
 # ----------------- Read gr3 file
+def process_nodes(node_lines: List[List[str]]) -> pd.DataFrame:
+    node_array = np.array(node_lines, dtype=float)
+    return pd.DataFrame(node_array, columns=["node_id", "long", "lat", "wse"]).astype({"node_id": int})
+
+def process_elements(element_lines: List[List[str]]) -> pd.DataFrame:
+    element_array = np.array(element_lines, dtype=int)
+    return pd.DataFrame(element_array, columns=["pg_id", "num_nodes", "node_id_1", "node_id_2", "node_id_3"]).astype({"pg_id": int})
+
 def read_gr3(file_path: str) -> Tuple[pd.DataFrame, pd.DataFrame, List[List[str]]]:
     """
     Reads a GR3 file and extracts node and element data into pandas DataFrames, 
@@ -90,54 +100,37 @@ def read_gr3(file_path: str) -> Tuple[pd.DataFrame, pd.DataFrame, List[List[str]
     0      1          3          1          2          3
     """
 
-    nodes = []
-    elements = []
+    # Initialize storage for extra lines
+    extra_lines = []
+
+    # Prepare storage for node and element lines
+    node_lines = []
+    element_lines = []
 
     with open(file_path, 'r') as file:
-        # Read the header line
         header = file.readline().strip()
         print("File Header:", header)
 
-        node_lines = []
-        element_lines = []
-        extra_lines = []
-        
+        # Classify lines in one pass
         for line in file:
             line = line.strip().split()
-            if len(line) == 4:  
+            if len(line) == 4:
                 node_lines.append(line)
-            elif len(line) == 5:  
+            elif len(line) == 5:
                 element_lines.append(line)
-            elif len(line) > 5: 
+            elif len(line) > 5:
                 extra_lines.append(line)
 
-        node_count = len(node_lines)
-        element_count = len(element_lines)
-        extra_count = len(extra_lines)
-        print(f"Detected Nodes: {node_count}, Elements: {element_count}, Extra: {extra_count}")
-        print(extra_lines)
+    # Process nodes and elements concurrently
+    with ThreadPoolExecutor() as executor:
+        node_future = executor.submit(process_nodes, node_lines)
+        element_future = executor.submit(process_elements, element_lines)
 
-        # Process node data
-        for line in node_lines:
-            node_id = int(line[0])
-            x, y, depth = map(float, line[1:4])
-            nodes.append({"node_id": node_id, "long": x, "lat": y, "wse": depth})
+        # Retrieve results
+        nodes_df = node_future.result()
+        elements_df = element_future.result()
 
-        # Process element data
-        for line in element_lines:
-            element_id = int(line[0])
-            num_node, n1, n2, n3 = list(map(int, line[1:]))  # Nodes that form the element
-            elements.append({
-                "pg_id": element_id, 
-                "num_nodes": num_node, 
-                "node_id_1": n1, 
-                "node_id_2": n2, 
-                "node_id_3": n3
-            })
-
-    # Convert lists to DataFrames
-    nodes_df = pd.DataFrame(nodes)
-    elements_df = pd.DataFrame(elements)
+    print(f"Detected Nodes: {len(nodes_df)}, Elements: {len(elements_df)}, Extra Lines: {len(extra_lines)}")
 
     return nodes_df, elements_df, extra_lines
 
