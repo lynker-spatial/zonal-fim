@@ -46,21 +46,21 @@ if __name__ == '__main__':
     #                        levee_table_name=levee_table_name, nwm_table_name=nwm_table_name, 
     #                        water_table_name=water_table_name, dissolve=dissolve) 
     # print('Masking complete. \n')
-    # print('Reading gr3 file.')
-    # start_section_1 = time.time()
-    # point_df, _, _ = rs.read_gr3(file_path) # -- needs to run many times
-    # gm.write_to_database(database_path, 'nodes', point_df) # -- needs to run many times
-    # gm.add_point_geo(database_path, 'nodes', 'lat', 'long') # -- needs to run many times --- maybe needed
-    # end_section_1 = time.time()
-    # time_section_1 = end_section_1 - start_section_1
-    # print(f"Time taken for section 1: {time_section_1:.2f} seconds")
-    # print('gr3 reading process complete. \n')
-    # print('Finding none overlapping nodes.')
-    # gm.get_none_overlapping(s3_path=s3_path, database_path=database_path, point_gdf_table='nodes')
-    # print('Found all none overlapping nodes. \n')
-    # print('Extracting elevation for nodes ...')
-    # gm.extract_elevation(s3_path=s3_path, database_path=database_path)
-    # print('Elevation extraction complete.\n')
+    print('Reading gr3 file.')
+    start_section_1 = time.time()
+    point_df, _, _ = rs.read_gr3(file_path) # -- needs to run many times
+    gm.write_to_database(database_path, 'nodes', point_df) # -- needs to run many times
+    gm.add_point_geo(database_path, 'nodes', 'lat', 'long') # -- needs to run many times --- maybe needed
+    end_section_1 = time.time()
+    time_section_1 = end_section_1 - start_section_1
+    print(f"Time taken for section 1: {time_section_1:.2f} seconds")
+    print('gr3 reading process complete. \n')
+    print('Finding none overlapping nodes.')
+    gm.get_none_overlapping(s3_path=s3_path, database_path=database_path, point_gdf_table='nodes')
+    print('Found all none overlapping nodes. \n')
+    print('Extracting elevation for nodes ...')
+    gm.extract_elevation(s3_path=s3_path, database_path=database_path)
+    print('Elevation extraction complete.\n')
     print('Masking elements, nodes, and DEM...')
     mb.filter_valid_elements(data_database_path=database_path, mask_database_path=mask_database_path) 
     # These will be used from now on -> null_filtered_masked_elements,  valid_nodes_elevations
@@ -70,7 +70,7 @@ if __name__ == '__main__':
     print('Extracting elevation for nodes and calculating barycentric ...')
     bc.compute_3d_barycentric(database_path=database_path, raster_path=s3_path, node_table_name='valid_nodes_elevations', 
                                 element_table_name='null_filtered_masked_elements')
-    # Output triangle_weights
+    # Output triangle_weights 
     print('Completed barycentric. \n')
 
 
