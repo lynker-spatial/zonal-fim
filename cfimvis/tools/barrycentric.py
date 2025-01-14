@@ -44,7 +44,7 @@ def calculate_slope(vertex: np.ndarray, other_vertex1: np.ndarray, other_vertex2
         - The function assumes the input coordinates are in the same coordinate system.
         - Returns the slope as a positive value (absolute).
     """
-    
+
     # Vectors from the vertex to the other two vertices
     vector1 = other_vertex1 - vertex
     vector2 = other_vertex2 - vertex
@@ -65,6 +65,30 @@ def calculate_slope(vertex: np.ndarray, other_vertex1: np.ndarray, other_vertex2
     return (slope1 + slope2) / 2
 
 def calculate_barycentric_weights(triangle_points: np.ndarray) -> np.ndarray:
+    """
+    The `calculate_barycentric_weights` function calculates the barycentric weights for a 3D triangle's vertices 
+    based on their slopes and spatial position. These weights are used to evaluate contributions of each 
+    vertex to the triangle's centroid or interpolation.
+
+    Input:
+        - triangle_points (np.ndarray): 
+            A 2D NumPy array of shape (3, 3) representing the coordinates [x, y, z] of the three vertices of a triangle.
+
+    Output:
+        - np.ndarray: 
+            A 1D NumPy array containing the normalized barycentric weights [w_A, w_B, w_C] for the three vertices.
+
+    Example:
+        1. Call the function:
+            weights = calculate_barycentric_weights(triangle_points)
+
+        2. Result:
+            The function returns the barycentric weights as a NumPy array, e.g., [0.33, 0.33, 0.33].
+
+    Notes:
+        - Handles flat regions by assigning equal weights to all vertices.
+        - Ensures weights are normalized and sum to 1.
+    """
     # Calculate the slopes for each vertex
     A_point = triangle_points[0]
     B_point = triangle_points[1]
