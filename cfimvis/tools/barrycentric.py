@@ -139,7 +139,39 @@ def calculate_barycentric_weights(triangle_points: np.ndarray) -> np.ndarray:
 
 def compute_3d_barycentric(database_path: str, mask_database_path: str, node_table_name: str, 
                            element_table_name: str) -> None:
-    
+    """
+    The `compute_3d_barycentric` function calculates and associates barycentric weights for 3D triangular elements
+    in a geospatial database. It processes a node table and an element table to derive weights for interpolation 
+    and stores the results for further use.
+
+    Input:
+        - database_path (str): 
+            Path to the DuckDB database containing the node and element tables.
+        - mask_database_path (str): 
+            Path to a second DuckDB database containing geometry for masking purposes.
+        - node_table_name (str): 
+            Name of the table containing nodes with coordinates (latitude, longitude, elevation).
+        - element_table_name (str): 
+            Name of the table containing triangular elements defined by node references.
+
+    Output:
+        - None: 
+            Results are stored in the database, including barycentric weights and associated data.
+
+    Example:
+        1. Define inputs:
+            database_path = "path/to/database.duckdb"
+            mask_database_path = "path/to/mask_database.duckdb"
+            node_table_name = "nodes"
+            element_table_name = "triangles"
+
+        2. Call the function:
+            compute_3d_barycentric(database_path, mask_database_path, node_table_name, element_table_name)
+
+    Notes:
+        - Processes triangle data in batches to handle large datasets efficiently.
+        - Handles CRS metadata and geometry restoration for further geospatial analysis.
+    """
     data_conn = ibis.duckdb.connect(database_path)
     try:
         data_conn.raw_sql('LOAD spatial')
@@ -191,16 +223,6 @@ def compute_3d_barycentric(database_path: str, mask_database_path: str, node_tab
     )
     triangles_df = data_conn.table('indexed_triangles').execute()
     triangles = triangles_df[['node_id_1', 'node_id_2', 'node_id_3']].to_numpy()
-    # Map node IDs to indices for the triangulation
-    # id_columns = ['pg_id', 'node_id_1', 'node_id_2', 'node_id_3']
-    # triangles_df = data_conn.table(element_table_name).select(id_columns).execute()
-    # id_columns.remove('pg_id')
-    # node_id_to_index = {node_id: idx for idx, node_id in enumerate(nodes_df['node_id'])}
-    # triangles_df[id_columns] = triangles_df[id_columns].applymap(node_id_to_index.get)
-    # triangles_df.dropna(inplace=True)
-    # triangles_df.reset_index(inplace=True, drop=True)
-    # triangles = triangles_df.drop(columns=['pg_id']).to_numpy()
-    
     
     # Process the triangle data in batches
     batch_size = 100000
