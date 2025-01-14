@@ -13,39 +13,38 @@ import numpy as np
 import os
 import shutil
 
-
-
-# def extract_elevation(raster_path: str, points_df: gpd.GeoDataFrame()) -> gpd.GeoDataFrame():
-#     with COGReader(raster_path) as cog:
-#         # Fix crs mismatches
-#         raster_crs = cog.dataset.crs
-#         points_crs = points_df.crs
-#         if points_crs != raster_crs:
-#             print("CRS mismatch detected. Transforming points to match raster CRS.")
-#             points_df = points_df.to_crs(raster_crs)
-#             print(f"new CRS: {points_df.crs}")
-#         else:
-#             print("CRS match. No transformation required.")
-
-#         # Extract raster values for the transformed points
-#         coords = [(geom.x, geom.y) for geom in points_df["geometry"]]
-#         values = []
-#         for x, y in tqdm(coords):
-#             try:
-#                 value = cog.point(x, y, coord_crs=raster_crs).array[0]
-#                 values.append(float(value))
-#             except PointOutsideBounds:
-#                 # Assign NaN if the point is outside the raster bounds
-#                 values.append(np.nan)
-
-
-#     # Add the extracted raster values to the Ibis DuckDB table
-#     points_df["elevation"] = values
-#     # Transform back to the 4326
-#     points_df.to_crs('EPSG:4326')
-#     return points_df
-
 def calculate_slope(vertex: np.ndarray, other_vertex1: np.ndarray, other_vertex2: np.ndarray) -> float:
+    """
+    The `calculate_slope` function calculates the average slope at a given vertex relative to two other vertices. 
+    The slope represents the rate of change in elevation (z-coordinate) over the horizontal distance.
+
+    Input:
+        - vertex (np.ndarray): 
+            A 1D NumPy array representing the coordinates [x, y, z] of the primary vertex.
+
+        - other_vertex1 (np.ndarray): 
+            A 1D NumPy array representing the coordinates [x, y, z] of the first neighboring vertex.
+
+        - other_vertex2 (np.ndarray): 
+            A 1D NumPy array representing the coordinates [x, y, z] of the second neighboring vertex.
+
+    Output:
+        - float: 
+            The average slope at the given vertex, computed as the mean of the slopes 
+            calculated between the primary vertex and the two neighboring vertices.
+
+    Example:
+        1. Call the function:
+            slope = calculate_slope(vertex, other_vertex1, other_vertex2)
+
+        2. Result:
+            The function returns the average slope based on the two neighboring vertices.
+
+    Notes:
+        - The function assumes the input coordinates are in the same coordinate system.
+        - Returns the slope as a positive value (absolute).
+    """
+    
     # Vectors from the vertex to the other two vertices
     vector1 = other_vertex1 - vertex
     vector2 = other_vertex2 - vertex
