@@ -32,7 +32,6 @@ MANIFEST
 *.html
 *.parquet
 *.png
-*.ipynb
 log/aws_config.json
 dl_parrallel.sh
 failed_downloads.txt
