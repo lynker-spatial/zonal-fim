@@ -31,7 +31,6 @@ MANIFEST
 *.wal
 *.html
 *.parquet
-*.png
 log/aws_config.json
 dl_parrallel.sh
 failed_downloads.txt
