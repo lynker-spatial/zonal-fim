@@ -8,49 +8,47 @@ import pandas as pd
 import numpy as np
 
 def estimate(database_path: str) -> None:
+    """
+    The `estimate` function processes spatial data stored in a DuckDB database to compute 
+    weighted centroids and water surface elevation (WSE) for triangular elements. It leverages 
+    the spatial extension of DuckDB and performs SQL-based operations for data preprocessing 
+    and computation. The results are stored in a table named `triangle_barycentric`.
+
+    Input:
+        - database_path (str): The file path to the DuckDB database containing the spatial 
+          data tables. These tables are expected to include:
+            * nodes: Contains `node_id`, `long`, `lat`, and `wse` (water surface elevation).
+            * elements: Contains `pg_id` (triangle ID) and the three nodes defining each triangle 
+              with their barycentric weights (`node1_weight`, `node2_weight`, `node3_weight`).
+
+    Output:
+        - None: The function modifies the database by creating or updating the table 
+          `triangle_barycentric` with the following computed columns:
+            * `centroid_long`: Longitude of the weighted centroid.
+            * `centroid_lat`: Latitude of the weighted centroid.
+            * `wse_weighted_average`: Weighted average of the water surface elevation for the triangle.
+
+    Example:
+        1. Ensure `nodes` and `elements` tables exist in the DuckDB database:
+            * `nodes` table includes `node_id`, `long`, `lat`, `wse`.
+            * `elements` table includes `pg_id`, `node_id_1`, `node_id_2`, `node_id_3`,
+              and barycentric weights for the three nodes.
+
+        2. Call the function:
+            estimate("path/to/database.duckdb")
+
+        3. Result:
+            A new table `triangle_barycentric` will be created with the original triangle data, 
+            computed centroids, and WSE averages.
+
+    """
+
     data_conn = ibis.duckdb.connect(database_path)
     try:
         data_conn.raw_sql('LOAD spatial')
     except: 
         data_conn.raw_sql('INSTALL spatial')
         data_conn.raw_sql('LOAD spatial')    
-    
-    # Mapping polygons to nodes ----------- << this could be part of preprocessing and table stored beforehand
-    # data_conn.raw_sql(
-    #     """
-    #     -- Add idx mapping to nodes and save it
-    #     CREATE OR REPLACE TABLE nodes_element_crosswalk AS
-    #     SELECT 
-    #         node_id,
-    #         ROW_NUMBER() OVER () - 1 AS idx
-    #     FROM tampa_nodes;
-
-    #     -- Map elements (triangles) to node indices using idx
-    #     CREATE OR REPLACE TABLE indexed_triangles AS
-    #     SELECT
-    #         el.pg_id,
-    #         n1.idx AS node_id_1,
-    #         n2.idx AS node_id_2,
-    #         n3.idx AS node_id_3
-    #     FROM elements el
-    #     LEFT JOIN nodes_element_crosswalk n1 ON el.node_id_1 = n1.node_id
-    #     LEFT JOIN nodes_element_crosswalk n2 ON el.node_id_2 = n2.node_id
-    #     LEFT JOIN nodes_element_crosswalk n3 ON el.node_id_3 = n3.node_id
-    #     WHERE n1.idx IS NOT NULL AND n2.idx IS NOT NULL AND n3.idx IS NOT NULL;
-
-    #     -- Restore original node IDs for indexed triangles
-    #     CREATE OR REPLACE TABLE original_triangles AS
-    #     SELECT
-    #         it.pg_id,
-    #         n1.node_id AS node_id_1,
-    #         n2.node_id AS node_id_2,
-    #         n3.node_id AS node_id_3
-    #     FROM indexed_triangles it
-    #     LEFT JOIN nodes_element_crosswalk n1 ON it.node_id_1 = n1.idx
-    #     LEFT JOIN nodes_element_crosswalk n2 ON it.node_id_2 = n2.idx
-    #     LEFT JOIN nodes_element_crosswalk n3 ON it.node_id_3 = n3.idx;
-    #     """
-    # )
 
     # Compute WSE based on barycentric weights for all elements
     data_conn.raw_sql(

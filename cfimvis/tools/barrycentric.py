@@ -13,39 +13,38 @@ import numpy as np
 import os
 import shutil
 
-
-
-# def extract_elevation(raster_path: str, points_df: gpd.GeoDataFrame()) -> gpd.GeoDataFrame():
-#     with COGReader(raster_path) as cog:
-#         # Fix crs mismatches
-#         raster_crs = cog.dataset.crs
-#         points_crs = points_df.crs
-#         if points_crs != raster_crs:
-#             print("CRS mismatch detected. Transforming points to match raster CRS.")
-#             points_df = points_df.to_crs(raster_crs)
-#             print(f"new CRS: {points_df.crs}")
-#         else:
-#             print("CRS match. No transformation required.")
-
-#         # Extract raster values for the transformed points
-#         coords = [(geom.x, geom.y) for geom in points_df["geometry"]]
-#         values = []
-#         for x, y in tqdm(coords):
-#             try:
-#                 value = cog.point(x, y, coord_crs=raster_crs).array[0]
-#                 values.append(float(value))
-#             except PointOutsideBounds:
-#                 # Assign NaN if the point is outside the raster bounds
-#                 values.append(np.nan)
-
-
-#     # Add the extracted raster values to the Ibis DuckDB table
-#     points_df["elevation"] = values
-#     # Transform back to the 4326
-#     points_df.to_crs('EPSG:4326')
-#     return points_df
-
 def calculate_slope(vertex: np.ndarray, other_vertex1: np.ndarray, other_vertex2: np.ndarray) -> float:
+    """
+    The `calculate_slope` function calculates the average slope at a given vertex relative to two other vertices. 
+    The slope represents the rate of change in elevation (z-coordinate) over the horizontal distance.
+
+    Input:
+        - vertex (np.ndarray): 
+            A 1D NumPy array representing the coordinates [x, y, z] of the primary vertex.
+
+        - other_vertex1 (np.ndarray): 
+            A 1D NumPy array representing the coordinates [x, y, z] of the first neighboring vertex.
+
+        - other_vertex2 (np.ndarray): 
+            A 1D NumPy array representing the coordinates [x, y, z] of the second neighboring vertex.
+
+    Output:
+        - float: 
+            The average slope at the given vertex, computed as the mean of the slopes 
+            calculated between the primary vertex and the two neighboring vertices.
+
+    Example:
+        1. Call the function:
+            slope = calculate_slope(vertex, other_vertex1, other_vertex2)
+
+        2. Result:
+            The function returns the average slope based on the two neighboring vertices.
+
+    Notes:
+        - The function assumes the input coordinates are in the same coordinate system.
+        - Returns the slope as a positive value (absolute).
+    """
+
     # Vectors from the vertex to the other two vertices
     vector1 = other_vertex1 - vertex
     vector2 = other_vertex2 - vertex
@@ -66,6 +65,30 @@ def calculate_slope(vertex: np.ndarray, other_vertex1: np.ndarray, other_vertex2
     return (slope1 + slope2) / 2
 
 def calculate_barycentric_weights(triangle_points: np.ndarray) -> np.ndarray:
+    """
+    The `calculate_barycentric_weights` function calculates the barycentric weights for a 3D triangle's vertices 
+    based on their slopes and spatial position. These weights are used to evaluate contributions of each 
+    vertex to the triangle's centroid or interpolation.
+
+    Input:
+        - triangle_points (np.ndarray): 
+            A 2D NumPy array of shape (3, 3) representing the coordinates [x, y, z] of the three vertices of a triangle.
+
+    Output:
+        - np.ndarray: 
+            A 1D NumPy array containing the normalized barycentric weights [w_A, w_B, w_C] for the three vertices.
+
+    Example:
+        1. Call the function:
+            weights = calculate_barycentric_weights(triangle_points)
+
+        2. Result:
+            The function returns the barycentric weights as a NumPy array, e.g., [0.33, 0.33, 0.33].
+
+    Notes:
+        - Handles flat regions by assigning equal weights to all vertices.
+        - Ensures weights are normalized and sum to 1.
+    """
     # Calculate the slopes for each vertex
     A_point = triangle_points[0]
     B_point = triangle_points[1]
@@ -116,7 +139,39 @@ def calculate_barycentric_weights(triangle_points: np.ndarray) -> np.ndarray:
 
 def compute_3d_barycentric(database_path: str, mask_database_path: str, node_table_name: str, 
                            element_table_name: str) -> None:
-    
+    """
+    The `compute_3d_barycentric` function calculates and associates barycentric weights for 3D triangular elements
+    in a geospatial database. It processes a node table and an element table to derive weights for interpolation 
+    and stores the results for further use.
+
+    Input:
+        - database_path (str): 
+            Path to the DuckDB database containing the node and element tables.
+        - mask_database_path (str): 
+            Path to a second DuckDB database containing geometry for masking purposes.
+        - node_table_name (str): 
+            Name of the table containing nodes with coordinates (latitude, longitude, elevation).
+        - element_table_name (str): 
+            Name of the table containing triangular elements defined by node references.
+
+    Output:
+        - None: 
+            Results are stored in the database, including barycentric weights and associated data.
+
+    Example:
+        1. Define inputs:
+            database_path = "path/to/database.duckdb"
+            mask_database_path = "path/to/mask_database.duckdb"
+            node_table_name = "nodes"
+            element_table_name = "triangles"
+
+        2. Call the function:
+            compute_3d_barycentric(database_path, mask_database_path, node_table_name, element_table_name)
+
+    Notes:
+        - Processes triangle data in batches to handle large datasets efficiently.
+        - Handles CRS metadata and geometry restoration for further geospatial analysis.
+    """
     data_conn = ibis.duckdb.connect(database_path)
     try:
         data_conn.raw_sql('LOAD spatial')
@@ -168,16 +223,6 @@ def compute_3d_barycentric(database_path: str, mask_database_path: str, node_tab
     )
     triangles_df = data_conn.table('indexed_triangles').execute()
     triangles = triangles_df[['node_id_1', 'node_id_2', 'node_id_3']].to_numpy()
-    # Map node IDs to indices for the triangulation
-    # id_columns = ['pg_id', 'node_id_1', 'node_id_2', 'node_id_3']
-    # triangles_df = data_conn.table(element_table_name).select(id_columns).execute()
-    # id_columns.remove('pg_id')
-    # node_id_to_index = {node_id: idx for idx, node_id in enumerate(nodes_df['node_id'])}
-    # triangles_df[id_columns] = triangles_df[id_columns].applymap(node_id_to_index.get)
-    # triangles_df.dropna(inplace=True)
-    # triangles_df.reset_index(inplace=True, drop=True)
-    # triangles = triangles_df.drop(columns=['pg_id']).to_numpy()
-    
     
     # Process the triangle data in batches
     batch_size = 100000

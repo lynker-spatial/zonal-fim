@@ -8,6 +8,42 @@ import pandas as pd
 import numpy as np
 
 def interpolate(database_path: str, s3_path: str) -> None:
+    """
+    The `interpolate` function processes spatial data to generate a raster file representing 
+    water surface elevation (WSE) using barycentric interpolation. It produces 
+    a GeoTIFF file as output.
+
+    Input:
+        - database_path (str): 
+            The file path to the DuckDB database containing required spatial data tables:
+              * `triangle_barycentric`: Includes `pg_id` and `wse_weighted_average`.
+              * `z_w`: Maps cells to polygons with `pg_id`, `cell`, and `coverage_fraction`.
+
+        - s3_path (str): 
+            The path to a reference GeoTIFF file on the local file system or an S3-compatible 
+            storage. This file provides raster dimensions and metadata.
+
+    Output:
+        - None: 
+            Generates a GeoTIFF raster file (`wse_barycentric_interpolation.tif`) containing 
+            interpolated WSE values.
+
+    Example:
+        1. Ensure the following data exists:
+           - DuckDB database (`my_database.duckdb`) with `triangle_barycentric` and `z_w` tables.
+           - Reference raster file (`DEM_masked_4326.tif`).
+
+        2. Call the function:
+            interpolate("my_database.duckdb", "data/DEM_masked_4326.tif")
+
+        3. Result:
+            A GeoTIFF file named `wse_barycentric_interpolation.tif` is created in the `data/` 
+            directory, containing interpolated WSE values.
+
+    Notes:
+        - The output file uses `float32` data type for raster values.
+
+    """
     data_conn = ibis.duckdb.connect(database_path)
     try:
         data_conn.raw_sql('LOAD spatial')
@@ -99,6 +135,46 @@ def interpolate(database_path: str, s3_path: str) -> None:
 
 def make_depth_raster(dem_path: str, wse_path: str = "data/wse_barycentric_interpolation.tif", 
                       mask_negative: bool = True) -> None:
+    """
+    The `make_depth_raster` function calculates a depth raster by computing the difference between 
+    a water surface elevation (WSE) raster and a digital elevation model (DEM) raster. The result 
+    is saved as a new GeoTIFF file.
+
+    Input:
+        - dem_path (str): 
+            File path to the DEM raster file. This file represents the elevation of the terrain.
+
+        - wse_path (str, optional): 
+            File path to the WSE raster file. The default value is 
+            "data/wse_barycentric_interpolation.tif". This raster represents water surface elevation.
+
+        - mask_negative (bool, optional): 
+            If True, negative values in the resulting depth raster are masked (set to `NaN`). 
+            Default is True.
+
+    Output:
+        - None: 
+            Generates a GeoTIFF raster file (`depth_barycentric_interpolation.tif`) in the `data/` 
+            directory, representing the depth values.
+
+    Example:
+        1. Ensure the following input files are available:
+           - A DEM raster file, e.g., `data/DEM_masked_4326.tif`.
+           - A WSE raster file, e.g., `data/wse_barycentric_interpolation.tif`.
+
+        2. Call the function:
+            make_depth_raster("data/DEM_masked_4326.tif", "data/wse_barycentric_interpolation.tif")
+
+        3. Result:
+            A GeoTIFF file named `depth_barycentric_interpolation.tif` is created in the `data/` 
+            directory, containing the depth values.
+
+    Notes:
+        - Both input rasters must have the same Coordinate Reference System (CRS). 
+          If they differ, the function raises a `ValueError`.
+        - NoData values in either raster are preserved in the output raster as `NaN`.
+    """
+    
     with rasterio.open(wse_path) as src1:
         wse_values = src1.read(1)  # Read the first band of raster1
         raster1_transform = src1.transform
