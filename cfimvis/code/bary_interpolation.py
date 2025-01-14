@@ -8,6 +8,42 @@ import pandas as pd
 import numpy as np
 
 def interpolate(database_path: str, s3_path: str) -> None:
+    """
+    The `interpolate` function processes spatial data to generate a raster file representing 
+    water surface elevation (WSE) using barycentric interpolation. It produces 
+    a GeoTIFF file as output.
+
+    Input:
+        - database_path (str): 
+            The file path to the DuckDB database containing required spatial data tables:
+              * `triangle_barycentric`: Includes `pg_id` and `wse_weighted_average`.
+              * `z_w`: Maps cells to polygons with `pg_id`, `cell`, and `coverage_fraction`.
+
+        - s3_path (str): 
+            The path to a reference GeoTIFF file on the local file system or an S3-compatible 
+            storage. This file provides raster dimensions and metadata.
+
+    Output:
+        - None: 
+            Generates a GeoTIFF raster file (`wse_barycentric_interpolation.tif`) containing 
+            interpolated WSE values.
+
+    Example:
+        1. Ensure the following data exists:
+           - DuckDB database (`my_database.duckdb`) with `triangle_barycentric` and `z_w` tables.
+           - Reference raster file (`DEM_masked_4326.tif`).
+
+        2. Call the function:
+            interpolate("my_database.duckdb", "data/DEM_masked_4326.tif")
+
+        3. Result:
+            A GeoTIFF file named `wse_barycentric_interpolation.tif` is created in the `data/` 
+            directory, containing interpolated WSE values.
+
+    Notes:
+        - The output file uses `float32` data type for raster values.
+
+    """
     data_conn = ibis.duckdb.connect(database_path)
     try:
         data_conn.raw_sql('LOAD spatial')
