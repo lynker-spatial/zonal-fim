@@ -28,25 +28,51 @@ def add_point_geo(database_path: str, table_name: str, lat_col_nam: str, long_co
     data_conn.con.close()
     return
 
-def write_to_database(database_path: str, table_name: str, df: pd.DataFrame([])) -> None:
+def write_to_database(database_path: str, table_name: str, df=None, df_path=None) -> None:
+    """
+    Writes data to a database. Accepts either a DataFrame or a file path.
+    
+    Args:
+        database_path (str): Path to the database.
+        table_name (str): Name of the table in the database.
+        df (pd.DataFrame, optional): DataFrame to write to the database.
+        df_path (str, optional): Path to a file containing the data.
+    
+    Raises:
+        ValueError: If both `df` and `df_path` are provided or neither is provided.
+    """
+    if (df is None and df_path is None) or (df is not None and df_path is not None):
+        raise ValueError("Provide either `df` or `df_path`, but not both.")
+    
+    # Connect to the database
     data_conn = ibis.duckdb.connect(database_path)
     data_conn.raw_sql('LOAD spatial')
-    
-    directory = 'temp'
-    if not os.path.exists(directory):
-        os.makedirs(directory)
-    df_temp_file = os.path.join(directory, 'temp.parquet')
-    df.to_parquet(df_temp_file, index=False)
-    del df
 
+    # Handle DataFrame input by saving it to a temporary file
+    temp_file = None
+    if df is not None:
+        directory = 'temp'
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+        temp_file = os.path.join(directory, 'temp.parquet')
+        df.to_parquet(temp_file, index=False)
+        del df
+        df_path = temp_file  # Use the temp file as the input path
+
+    # Create or replace the table using the provided or temporary path
     data_conn.raw_sql(
         f"""
         CREATE OR REPLACE TABLE {table_name} AS
-        SELECT * FROM '{df_temp_file}'
+        SELECT * FROM '{df_path}'
         """
     )
-    os.remove(df_temp_file)
-    os.rmdir(directory)
+
+    # Clean up temporary file and directory, if created
+    if temp_file:
+        os.remove(temp_file)
+        os.rmdir(directory)
+    
+    # Close the database connection
     data_conn.con.close()
     return
 
