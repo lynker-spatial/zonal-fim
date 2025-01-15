@@ -1,4 +1,7 @@
 # tools/read_schisim.py
+import duckdb
+import ibis
+from ibis import _
 import pandas as pd
 import geopandas as gpd
 import numpy as np
@@ -139,4 +142,17 @@ def index_triangles(triangles_path: str) -> None:
     triangle_shapes.rename(columns={'FID': 'pg_id'}, inplace=True)
     triangle_shapes['pg_id'] += 1
     triangle_shapes.to_parquet(triangles_path, index=False)
+    return
+
+def mask_elements(database_path: str) -> None:
+    data_conn = ibis.duckdb.connect(database_path)
+    data_conn.raw_sql('LOAD spatial')
+    data_conn.raw_sql(
+        f"""
+        CREATE OR REPLACE TABLE masked_elements AS
+        SELECT * FROM elements AS e
+        WHERE e.pg_id IN (SELECT pg_id FROM masked_coverage_fraction);
+        """
+    )
+    data_conn.con.close()
     return
