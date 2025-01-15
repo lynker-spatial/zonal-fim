@@ -16,7 +16,7 @@ pacman::p_load(
 base <- '/Users/mikejohnson/Downloads/coastal_data'
 
 
-gpkg <- glue('{base}/bary_triangles.gpkg')
+gpkg <- glue('{base}/agElementPolygons.gpkg')
 weights_file <- glue('{base}/coverage_fraction.parquet')
 d <- rast(glue('{base}/TBDEM_AtlanticGulf_Mosaic_NWM_3_Revised_v4_COG_4326.tif'))
 mask_file <- glue("{base}/mask.tif")

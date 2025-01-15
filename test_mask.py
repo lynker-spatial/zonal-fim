@@ -5,10 +5,10 @@ import time
 from cfimvis.tools import mask_bounds as mb
 from cfimvis.tools import geometry_manipulation as gm
 from cfimvis.tools import read_schisim as rs
-# from cfimvis.tools import barrycentric as bc
+from cfimvis.tools import barrycentric as bc
 from cfimvis.tools import zonal_operations as zo
-# from cfimvis.code import bary_estimation as be
-# from cfimvis.code import bary_interpolation as bi 
+from cfimvis.code import bary_estimation as be
+from cfimvis.code import bary_interpolation as bi 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Build general mask')
@@ -39,55 +39,70 @@ if __name__ == '__main__':
     nwm_table_name = args['nwm_table_name']
     water_table_name = args['water_table_name']
     dissolve = args['dissolve']
+    print('\n')
 
-    # print('Creating single mask ...')
-    # mb.create_general_mask(database_path=mask_database_path, triangles_path=triangles_path, 
-    #                        schisim_table_name=schisim_table_name, state_table_name=state_table_name, 
-    #                        levee_table_name=levee_table_name, nwm_table_name=nwm_table_name, 
-    #                        water_table_name=water_table_name, dissolve=dissolve) 
-    # print('Masking complete. \n')
-    # Ingest coverage fraction data
-    print('Ingesting zonal output file ...')
-    gm.write_to_database(database_path, 'coverage_fraction', df_path=zonal_path) 
-    zo.filter_masked(database_path)
-    print('Added zonal output file to duckdb.')
-    # Ingest and filter triangles data
-    print("Ingesting triangles data ...")
-    gm.mask_triangles(database_path, triangles_path)
-    print('Added triangle elements to duckdb.')
-    print('Ingest element to node crosswalk ...')
-    _, elements_df, _ = rs.read_gr3(file_path) 
-    gm.write_to_database(database_path, 'elements', df=elements_df)
-    rs.mask_elements(database_path)
-    print('Added elements crosswalk to duckdb.')
+    generate_mask = False
+    preprocess = True
+
+    if generate_mask:
+        print('Creating single mask ...')
+        mb.create_general_mask(database_path=mask_database_path, triangles_path=triangles_path, 
+                            schisim_table_name=schisim_table_name, state_table_name=state_table_name, 
+                            levee_table_name=levee_table_name, nwm_table_name=nwm_table_name, 
+                            water_table_name=water_table_name, dissolve=dissolve) 
+        print('Masking complete. \n')
+    #_____________________________
+
+    if preprocess:
+        # Ingest coverage fraction data
+        print('Ingesting zonal output file ...')
+        gm.write_to_database(database_path, 'coverage_fraction', df_path=zonal_path) 
+        zo.filter_masked(database_path)
+        print('Added zonal output file to duckdb.\n')
+        # Ingest and filter triangles data
+        print("Ingesting triangles data ...")
+        mb.mask_triangles(database_path, triangles_path)
+        print('Added triangle elements to duckdb.\n')
+        print('Ingest element to node crosswalk ...')
+        point_df, elements_df, _ = rs.read_gr3(file_path) 
+        gm.write_to_database(database_path, 'nodes', df=point_df) 
+        gm.write_to_database(database_path, 'elements', df=elements_df)
+        rs.mask_elements(database_path)
+        print('Added elements crosswalk to duckdb.\n')
+        print('Extracting elevation for nodes ...')
+        gm.add_point_geo(database_path, 'nodes', 'lat', 'long') # -- needs to run many times --- maybe needed
+        gm.extract_elevation(s3_path=s3_path, database_path=database_path)
+        # gm.mask_nodes(database_path, 'nodes_elevation', 'masked_nodes_elevation') # -- needs to run many times
+        print('Elevation extraction complete.\n')
 
     print('Reading gr3 file.')
     start_section_1 = time.time()
     point_df, _, _ = rs.read_gr3(file_path) # -- needs to run many times
     gm.write_to_database(database_path, 'nodes', df=point_df) # -- needs to run many times
-    gm.mask_nodes(database_path) # -- needs to run many times
-    gm.add_point_geo(database_path, 'masked_nodes', 'lat', 'long') # -- needs to run many times --- maybe needed
+    gm.mask_nodes(database_path, 'nodes', 'masked_nodes') # -- needs to run many times
+    gm.add_elevation(database_path, 'masked_nodes', 'nodes_elevation')
+    # gm.add_point_geo(database_path, 'masked_nodes', 'lat', 'long') # -- needs to run many times --- maybe needed
     end_section_1 = time.time()
     time_section_1 = end_section_1 - start_section_1
     print(f"Time taken for section 1: {time_section_1:.2f} seconds")
     print('gr3 reading process complete. \n')
+    #_____________________________
+
     # print('Finding none overlapping nodes.')
     # gm.get_none_overlapping(s3_path=s3_path, database_path=database_path, point_gdf_table='nodes')
     # print('Found all none overlapping nodes. \n')
-    # print('Extracting elevation for nodes ...')
-    # gm.extract_elevation(s3_path=s3_path, database_path=database_path)
-    # print('Elevation extraction complete.\n')
+    
     # print('Masking elements, nodes, and DEM...')
     # mb.filter_valid_elements(data_database_path=database_path, mask_database_path=mask_database_path) 
-    # # These will be used from now on -> null_filtered_masked_elements,  valid_nodes_elevations
+    # # These will be used from now on -> nu+ll_filtered_masked_elements,  valid_nodes_elevations
     # mb.mask_raster(mask_database_path=mask_database_path, raster_path=s3_path)
     # print('Masking complete. \n')
-
-    # print('Extracting elevation for nodes and calculating barycentric ...')
-    # bc.compute_3d_barycentric(database_path=database_path, raster_path=s3_path, node_table_name='valid_nodes_elevations', 
-    #                             element_table_name='null_filtered_masked_elements')
-    # # Output triangle_weights 
-    # print('Completed barycentric. \n')
+    if preprocess:
+        print('Extracting elevation for nodes and calculating barycentric ...')
+        bc.compute_3d_barycentric(database_path=database_path, raster_path=s3_path, node_table_name='masked_nodes', 
+                                    element_table_name='masked_elements')
+        # Output triangle_weights 
+        print('Completed barycentric. \n')
 
 
     # print('Barycentric interpolation...')
