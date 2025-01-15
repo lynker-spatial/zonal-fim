@@ -167,7 +167,7 @@ def mask_triangles(database_path: str, triangles_path: str) -> None:
     data_conn.con.close()
     return
 
-def filter_valid_elements(data_database_path: str, mask_database_path: str) -> None:
+def filter_valid_elements(data_database_path: str) -> None:
 
     data_conn = ibis.duckdb.connect(data_database_path)
     try:
@@ -175,46 +175,46 @@ def filter_valid_elements(data_database_path: str, mask_database_path: str) -> N
     except: 
         data_conn.raw_sql('INSTALL spatial')
         data_conn.raw_sql('LOAD spatial')
-    data_conn.raw_sql(f"ATTACH '{mask_database_path}' AS mask_db;")
+    # data_conn.raw_sql(f"ATTACH '{mask_database_path}' AS mask_db;")
 
     # Create A new table for masked elements
-    data_conn.raw_sql(
-        """ 
-        CREATE OR REPLACE TABLE masked_elements AS 
-        SELECT el.* 
-        FROM elements AS el
-        INNER JOIN mask_db.triangles_masked as m
-        ON el.pg_id = m.pg_id;
-        """
-    )
+    # data_conn.raw_sql(
+    #     """ 
+    #     CREATE OR REPLACE TABLE masked_elements AS 
+    #     SELECT el.* 
+    #     FROM elements AS el
+    #     INNER JOIN mask_db.triangles_masked as m
+    #     ON el.pg_id = m.pg_id;
+    #     """
+    # )
     # Also filter for null values in elevation (points outside domain)
     data_conn.raw_sql(
         """ 
         CREATE OR REPLACE TABLE null_filtered_masked_elements AS
         SELECT *
         FROM masked_elements AS me
-        WHERE node_id_1 NOT IN (SELECT node_id FROM nodes_elevation WHERE elevation IS NULL) 
-            AND node_id_2 NOT IN (SELECT node_id FROM nodes_elevation WHERE elevation IS NULL) 
-            AND node_id_3 NOT IN (SELECT node_id FROM nodes_elevation WHERE elevation IS NULL);
+        WHERE node_id_1 IN (SELECT node_id FROM masked_nodes) 
+            AND node_id_2 IN (SELECT node_id FROM masked_nodes) 
+            AND node_id_3 IN (SELECT node_id FROM masked_nodes);
         """
     )
 
     # Filter to all valid nodes (nodes with elevation and associated with masked elements)
-    data_conn.raw_sql(
-        """
-        CREATE OR REPLACE TABLE valid_nodes_elevations AS
-        SELECT *
-        FROM nodes_elevation AS ne
-        WHERE elevation IS NOT NULL
-        AND node_id IN (
-            SELECT node_id_1 FROM null_filtered_masked_elements
-            UNION
-            SELECT node_id_2 FROM null_filtered_masked_elements
-            UNION
-            SELECT node_id_3 FROM null_filtered_masked_elements
-        );
-        """
-    )
+    # data_conn.raw_sql(
+    #     """
+    #     CREATE OR REPLACE TABLE valid_nodes_elevations AS
+    #     SELECT *
+    #     FROM nodes_elevation AS ne
+    #     WHERE elevation IS NOT NULL
+    #     AND node_id IN (
+    #         SELECT node_id_1 FROM null_filtered_masked_elements
+    #         UNION
+    #         SELECT node_id_2 FROM null_filtered_masked_elements
+    #         UNION
+    #         SELECT node_id_3 FROM null_filtered_masked_elements
+    #     );
+    #     """
+    # )
     data_conn.con.close()
     return
 

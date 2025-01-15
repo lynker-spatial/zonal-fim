@@ -137,8 +137,7 @@ def calculate_barycentric_weights(triangle_points: np.ndarray) -> np.ndarray:
     weights_3d = np.array([weight_A, weight_B, weight_C])
     return weights_3d
 
-def compute_3d_barycentric(database_path: str, mask_database_path: str, node_table_name: str, 
-                           element_table_name: str) -> None:
+def compute_3d_barycentric(database_path: str, node_table_name: str, element_table_name: str) -> None:
     """
     The `compute_3d_barycentric` function calculates and associates barycentric weights for 3D triangular elements
     in a geospatial database. It processes a node table and an element table to derive weights for interpolation 
@@ -179,7 +178,7 @@ def compute_3d_barycentric(database_path: str, mask_database_path: str, node_tab
         data_conn.raw_sql('INSTALL spatial')
         data_conn.raw_sql('LOAD spatial')
     nodes_df = data_conn.table(node_table_name).execute()
-    nodes_df = nodes_df.set_crs(epsg='4326')
+    # nodes_df = nodes_df.set_crs(epsg='4326')
     points_dem = nodes_df[['long', 'lat', 'elevation']].to_numpy()  
 
     output_folder = 'temp'  
@@ -293,9 +292,9 @@ def compute_3d_barycentric(database_path: str, mask_database_path: str, node_tab
         CREATE OR REPLACE TABLE triangle_weights AS
         SELECT
                 el.*,
-                bw.* EXCLUDE (pg_id, node_id1, node_id2, node_id3)
+                bw.* EXCLUDE (pg_id, node_id_1, node_id_2, node_id_3)
         FROM 
-            elements AS el
+            masked_elements AS el
         LEFT JOIN
             bary_weights AS bw
         ON
@@ -333,18 +332,18 @@ def compute_3d_barycentric(database_path: str, mask_database_path: str, node_tab
     )
 
     # Add geometry back
-    data_conn.raw_sql(f"ATTACH '{mask_database_path}' AS mask_db;")
+    # data_conn.raw_sql(f"ATTACH '{mask_database_path}' AS mask_db;")
 
     # Create A new table for masked elements <---- we can keep geometry form the start to avoid this something to fix later on
-    data_conn.raw_sql(
-        """ 
-        ALTER TABLE triangle_weights ADD COLUMN geometry GEOMETRY;
-        UPDATE triangle_weights
-        SET geometry = mask_db.triangles.geometry
-        FROM mask_db.triangles
-        WHERE triangle_weights.pg_id = mask_db.triangles.pg_id;
-        """
-    )
+    # data_conn.raw_sql(
+    #     """ 
+    #     ALTER TABLE triangle_weights ADD COLUMN geometry GEOMETRY;
+    #     UPDATE triangle_weights
+    #     SET geometry = mask_db.triangles.geometry
+    #     FROM mask_db.triangles
+    #     WHERE triangle_weights.pg_id = mask_db.triangles.pg_id;
+    #     """
+    # )
 
     # Look for any problems
     triangle_elements = data_conn.table('triangle_weights')
@@ -356,15 +355,15 @@ def compute_3d_barycentric(database_path: str, mask_database_path: str, node_tab
     )
     nan_counts_result = nan_counts.execute()
     nan_flag = nan_counts_result.sum().sum()
-    if nan_flag == 0:
+    if nan_flag != 0:
         print("Found nan in triangles check previous steps")
         print(nan_counts_result)
     
     # Save for R
-    triangle_elements = data_conn.table('triangle_weights').execute()
-    triangle_elements = triangle_elements.set_crs(epsg=4326)
-    print("Saving to gpkg for R ...")
-    triangle_elements.to_file("data/bary_triangles.gpkg", layer="triangles", driver="GPKG")
+    # triangle_elements = data_conn.table('triangle_weights').execute()
+    # triangle_elements = triangle_elements.set_crs(epsg=4326)
+    # print("Saving to gpkg for R ...")
+    # triangle_elements.to_file("data/bary_triangles.gpkg", layer="triangles", driver="GPKG")
 
     # Clean up
     if os.path.exists(output_folder):
