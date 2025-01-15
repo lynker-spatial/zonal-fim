@@ -27,6 +27,7 @@ share/python-wheels/
 MANIFEST
 
 # Files
+config.md
 *.duckdb
 *.wal
 *.html
@@ -39,6 +40,7 @@ failed_downloads.txt
 *.tif
 
 # Folders
+.vscode/settings.json
 data/*
 DEM/*
 saved_batches*/*
@@ -179,3 +181,4 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 .Rproj.user
+.vscode/settings.json

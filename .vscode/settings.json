@@ -1,5 +1,8 @@
 {
     "cSpell.words": [
         "preconfigured"
+    ],
+    "python.analysis.extraPaths": [
+        "./cfimvis"
     ]
 }
