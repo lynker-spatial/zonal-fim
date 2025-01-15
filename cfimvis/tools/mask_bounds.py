@@ -132,32 +132,39 @@ def create_general_mask(database_path: str, triangles_path: str,
         SELECT * FROM '{temp_file}'
         """
     )
-    mask_conn.raw_sql(
-        f"""
-        CREATE OR REPLACE TABLE triangles AS 
-        SELECT * FROM '{triangles_path}'
-        """
-    )
-    
-    # Mask triangles that are fully overlap with costal mask
-    mask_conn.raw_sql(
-        """
-        CREATE OR REPLACE TABLE triangles_masked AS
-        SELECT 
-            t.* -- Keep pg_id from the table
-        FROM 
-            triangles AS t, step_5 AS s
-        WHERE 
-            ST_Intersects(t.geometry, s.geometry) -- Keep triangles that intersect
-            AND NOT ST_Within(t.geometry, s.geometry) -- Exclude those completely within step_5
-            OR NOT ST_Intersects(t.geometry, s.geometry); -- Keep triangles that do not intersect at all
-        """
-    )
     # Cleanup
     print('Completed masking.')
     os.remove(temp_file)
     os.rmdir(directory)
     mask_conn.con.close()
+    return
+
+def mask_triangles(database_path: str, triangles_path: str) -> None:
+    data_conn = ibis.duckdb.connect(database_path)
+    data_conn.raw_sql(
+        f"""
+        CREATE OR REPLACE TABLE triangles AS 
+        SELECT t.* 
+        FROM '{triangles_path}' t
+        WHERE t.pg_id IN (SELECT pg_id FROM masked_coverage_fraction)
+        """
+    )
+    # Mask triangles that are fully overlap with costal mask
+    # data_conn.raw_sql(
+    #     """
+    #     CREATE OR REPLACE TABLE triangles_masked AS
+    #     SELECT 
+    #         t.* -- Keep pg_id from the table
+    #     FROM 
+    #         triangles AS t, step_5 AS s
+    #     WHERE 
+    #         ST_Intersects(t.geometry, s.geometry) -- Keep triangles that intersect
+    #         AND NOT ST_Within(t.geometry, s.geometry) -- Exclude those completely within step_5
+    #         OR NOT ST_Intersects(t.geometry, s.geometry); -- Keep triangles that do not intersect at all
+    #     """
+    # )
+    # Cleanup
+    data_conn.con.close()
     return
 
 def filter_valid_elements(data_database_path: str, mask_database_path: str) -> None:

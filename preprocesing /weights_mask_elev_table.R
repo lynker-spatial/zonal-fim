@@ -12,7 +12,7 @@ base <- '/Users/mikejohnson/hydrofabric/coastal-fim'
 
 
 gpkg <- glue('{base}/bary_triangles.gpkg')
-weights_file <- glue('{base}/bary_weights.parquet')
+weights_file <- glue('{base}/coverage_fraction.parquet')
 d <- rast(glue('{base}/TBDEM_AtlanticGulf_Mosaic_NWM_3_Revised_v4_COG_4326.tif'))
 mask_file <- glue("{base}/mask.tif")
 
