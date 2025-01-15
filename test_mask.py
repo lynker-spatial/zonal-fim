@@ -6,7 +6,7 @@ from cfimvis.tools import mask_bounds as mb
 from cfimvis.tools import geometry_manipulation as gm
 from cfimvis.tools import read_schisim as rs
 # from cfimvis.tools import barrycentric as bc
-# from cfimvis.tools import zonal_operations as zo
+from cfimvis.tools import zonal_operations as zo
 # from cfimvis.code import bary_estimation as be
 # from cfimvis.code import bary_interpolation as bi 
 
@@ -49,7 +49,13 @@ if __name__ == '__main__':
     # Ingest coverage fraction data
     print('Ingesting zonal output file ...')
     gm.write_to_database(database_path, 'coverage_fraction', df_path=zonal_path) 
+    zo.filter_masked(database_path)
     print('Added zonal output file to duckdb.')
+    # Ingest and filter triangles data
+    print("Ingesting triangles data ...")
+    gm.mask_triangles(database_path, triangles_path)
+    print('Added triangle elements to duckdb.')
+    
     print('Reading gr3 file.')
     # start_section_1 = time.time()
     point_df, _, _ = rs.read_gr3(file_path) # -- needs to run many times
