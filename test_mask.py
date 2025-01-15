@@ -55,16 +55,22 @@ if __name__ == '__main__':
     print("Ingesting triangles data ...")
     gm.mask_triangles(database_path, triangles_path)
     print('Added triangle elements to duckdb.')
-    
+    print('Ingest element to node crosswalk ...')
+    _, elements_df, _ = rs.read_gr3(file_path) 
+    gm.write_to_database(database_path, 'elements', df=elements_df)
+    rs.mask_elements(database_path)
+    print('Added elements crosswalk to duckdb.')
+
     print('Reading gr3 file.')
-    # start_section_1 = time.time()
+    start_section_1 = time.time()
     point_df, _, _ = rs.read_gr3(file_path) # -- needs to run many times
     gm.write_to_database(database_path, 'nodes', df=point_df) # -- needs to run many times
-    # gm.add_point_geo(database_path, 'nodes', 'lat', 'long') # -- needs to run many times --- maybe needed
-    # end_section_1 = time.time()
-    # time_section_1 = end_section_1 - start_section_1
-    # print(f"Time taken for section 1: {time_section_1:.2f} seconds")
-    # print('gr3 reading process complete. \n')
+    gm.mask_nodes(database_path) # -- needs to run many times
+    gm.add_point_geo(database_path, 'masked_nodes', 'lat', 'long') # -- needs to run many times --- maybe needed
+    end_section_1 = time.time()
+    time_section_1 = end_section_1 - start_section_1
+    print(f"Time taken for section 1: {time_section_1:.2f} seconds")
+    print('gr3 reading process complete. \n')
     # print('Finding none overlapping nodes.')
     # gm.get_none_overlapping(s3_path=s3_path, database_path=database_path, point_gdf_table='nodes')
     # print('Found all none overlapping nodes. \n')

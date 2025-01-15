@@ -28,7 +28,7 @@ def add_point_geo(database_path: str, table_name: str, lat_col_nam: str, long_co
     data_conn.con.close()
     return
 
-def write_to_database(database_path: str, table_name: str, df=None, df_path=None) -> None:
+def write_to_database(database_path: str, table_name: str, df:pd.DataFrame([])=None, df_path: str=None) -> None:
     """
     Writes data to a database. Accepts either a DataFrame or a file path.
     
@@ -75,6 +75,8 @@ def write_to_database(database_path: str, table_name: str, df=None, df_path=None
     # Close the database connection
     data_conn.con.close()
     return
+
+
 
 def get_none_overlapping(s3_path: str, database_path: str, point_gdf_table: str) -> None:
     data_conn = ibis.duckdb.connect(database_path)
@@ -207,4 +209,23 @@ def extract_elevation(s3_path: str, database_path: str) -> gpd.GeoDataFrame([]):
     os.rmdir(directory)
     data_conn.con.close()
     return 
+
+def mask_nodes(database_path: str) -> None:
+    data_conn = ibis.duckdb.connect(database_path)
+    data_conn.raw_sql('LOAD spatial')
+    data_conn.raw_sql(
+        """
+        CREATE OR REPLACE TABLE masked_nodes AS
+        SELECT * FROM nodes AS n
+        WHERE node_id IN (
+            SELECT node_id_1 FROM masked_elements
+            UNION
+            SELECT node_id_2 FROM masked_elements
+            UNION
+            SELECT node_id_3 FROM masked_elements
+        );
+        """
+    )
+    data_conn.con.close()
+    return
 
