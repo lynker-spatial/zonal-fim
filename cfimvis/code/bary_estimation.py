@@ -29,7 +29,7 @@ def estimate(database_path: str) -> None:
             * `wse_weighted_average`: Weighted average of the water surface elevation for the triangle.
 
     Example:
-        1. Ensure `nodes` and `elements` tables exist in the DuckDB database:
+        1. Ensure `masked_nodes` and `elements` tables exist in the DuckDB database:
             * `nodes` table includes `node_id`, `long`, `lat`, `wse`.
             * `elements` table includes `pg_id`, `node_id_1`, `node_id_2`, `node_id_3`,
               and barycentric weights for the three nodes.
@@ -60,7 +60,7 @@ def estimate(database_path: str) -> None:
             long,
             lat,
             wse
-        FROM nodes;
+        FROM masked_nodes;
 
         -- Join triangle table with node data to get vertex coordinates
         CREATE OR REPLACE TEMP TABLE triangle_vertices AS 
@@ -71,7 +71,7 @@ def estimate(database_path: str) -> None:
             n1.long AS node1_long, n1.lat AS node1_lat, n1.wse AS node1_wse,
             n2.long AS node2_long, n2.lat AS node2_lat, n2.wse AS node2_wse,
             n3.long AS node3_long, n3.lat AS node3_lat, n3.wse AS node3_wse
-        FROM original_triangles t
+        FROM triangle_weights t
         JOIN nodes_data n1 ON t.node_id_1 = n1.node_id 
         JOIN nodes_data n2 ON t.node_id_2 = n2.node_id 
         JOIN nodes_data n3 ON t.node_id_3 = n3.node_id; 
@@ -92,7 +92,7 @@ def estimate(database_path: str) -> None:
             wc.centroid_long,
             wc.centroid_lat,
             wc.wse_weighted_average
-        FROM original_triangles t
+        FROM triangle_weights t
         LEFT JOIN weighted_centroids wc ON t.pg_id = wc.pg_id;
         """
     )
