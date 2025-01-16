@@ -240,12 +240,6 @@ def add_elevation(database_path: str, table_name:str, elevation_table:str) -> No
         LEFT JOIN '{elevation_table}' AS e
         ON n.node_id = e.node_id
         WHERE e.elevation IS NOT NULL;
-        -- update masked elements
-        CREATE OR REPLACE TABLE masked_elements AS
-        SELECT * FROM masked_elements AS me
-        WHERE me.node_id_1 NOT IN (SELECT node_id FROM {table_name}) 
-            AND me.node_id_2 NOT IN (SELECT node_id FROM {table_name}) 
-            AND me.node_id_3 NOT IN (SELECT node_id FROM {table_name});
         """
     )
     data_conn.con.close()

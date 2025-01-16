@@ -12,6 +12,7 @@ from tqdm import tqdm
 import numpy as np
 import os
 import shutil
+from collections import defaultdict
 
 def calculate_slope(vertex: np.ndarray, other_vertex1: np.ndarray, other_vertex2: np.ndarray) -> float:
     """
@@ -178,138 +179,164 @@ def compute_3d_barycentric(database_path: str, node_table_name: str, element_tab
         data_conn.raw_sql('INSTALL spatial')
         data_conn.raw_sql('LOAD spatial')
     nodes_df = data_conn.table(node_table_name).execute()
+    node_coords_dict = nodes_df.set_index('node_id')[['long', 'lat', 'elevation']].to_dict('index')
+    triangles_df = data_conn.table(element_table_name).execute()
+
+    # Process triangles in batches
+    w_A_list = []
+    w_B_list = []
+    w_C_list = []
+
+    for index, row in tqdm(triangles_df.iterrows(), total=len(triangles_df), desc="Processing Triangles"):
+        node_ids = [row['node_id_1'], row['node_id_2'], row['node_id_3']]
+        
+        # Fetch coordinates for the current triangle's nodes
+        node_coords = [node_coords_dict.get(node_id) for node_id in node_ids]
+        if all(coord is not None for coord in node_coords):
+            triangle_points_dem = np.array([list(coord.values()) for coord in node_coords])
+        else:
+            print (f"problem fetching triangle points with id {row['pg_id']} and node_ids {node_ids}")
+            w_A_list.append(None)
+            w_B_list.append(None)
+            w_C_list.append(None)
+            continue
+        
+        # Calculate barycentric weights
+        weights = calculate_barycentric_weights(triangle_points_dem)
+        
+        # Append weights to the lists
+        w_A_list.append(weights[0])
+        w_B_list.append(weights[1])
+        w_C_list.append(weights[2])
+
+    # add the list of values as new columns in the table
+    triangles_df['node1_weight'] = w_A_list
+    triangles_df['node2_weight'] = w_B_list
+    triangles_df['node3_weight'] = w_C_list
+
     # nodes_df = nodes_df.set_crs(epsg='4326')
-    points_dem = nodes_df[['long', 'lat', 'elevation']].to_numpy()  
+    # points_dem = nodes_df[['long', 'lat', 'elevation']].to_numpy()  
 
     output_folder = 'temp'  
     os.makedirs(output_folder, exist_ok=True)
     
-    # Mapping polygons to nodes 
-    data_conn.raw_sql(
-        f"""
-        -- Add idx mapping to nodes and save it
-        CREATE OR REPLACE TABLE node_element_crosswalk AS
-        SELECT 
-            node_id,
-            ROW_NUMBER() OVER () - 1 AS idx
-        FROM {node_table_name};
+    # # Mapping polygons to nodes 
+    # data_conn.raw_sql(
+    #     f"""
+    #     -- Add idx mapping to nodes and save it
+    #     CREATE OR REPLACE TABLE node_element_crosswalk AS
+    #     SELECT 
+    #         node_id,
+    #         ROW_NUMBER() OVER () - 1 AS idx
+    #     FROM {node_table_name};
 
-        -- Map elements (triangles) to node indices using idx
-        CREATE OR REPLACE TABLE indexed_triangles AS
-        SELECT
-            el.pg_id,
-            n1.idx AS node_id_1,
-            n2.idx AS node_id_2,
-            n3.idx AS node_id_3
-        FROM {element_table_name} el
-        LEFT JOIN node_element_crosswalk n1 ON el.node_id_1 = n1.node_id
-        LEFT JOIN node_element_crosswalk n2 ON el.node_id_2 = n2.node_id
-        LEFT JOIN node_element_crosswalk n3 ON el.node_id_3 = n3.node_id
-        WHERE n1.idx IS NOT NULL AND n2.idx IS NOT NULL AND n3.idx IS NOT NULL;
+    #     -- Map elements (triangles) to node indices using idx
+    #     CREATE OR REPLACE TABLE indexed_triangles AS
+    #     SELECT
+    #         el.pg_id,
+    #         n1.idx AS node_id_1,
+    #         n2.idx AS node_id_2,
+    #         n3.idx AS node_id_3
+    #     FROM {element_table_name} el
+    #     LEFT JOIN node_element_crosswalk n1 ON el.node_id_1 = n1.node_id
+    #     LEFT JOIN node_element_crosswalk n2 ON el.node_id_2 = n2.node_id
+    #     LEFT JOIN node_element_crosswalk n3 ON el.node_id_3 = n3.node_id
+    #     WHERE n1.idx IS NOT NULL AND n2.idx IS NOT NULL AND n3.idx IS NOT NULL;
 
-        -- Restore original node IDs for indexed triangles
-        CREATE OR REPLACE TABLE original_triangles AS
-        SELECT
-            it.pg_id,
-            n1.node_id AS node_id_1,
-            n2.node_id AS node_id_2,
-            n3.node_id AS node_id_3
-        FROM indexed_triangles it
-        LEFT JOIN node_element_crosswalk n1 ON it.node_id_1 = n1.idx
-        LEFT JOIN node_element_crosswalk n2 ON it.node_id_2 = n2.idx
-        LEFT JOIN node_element_crosswalk n3 ON it.node_id_3 = n3.idx;
-        """
-    )
-    triangles_df = data_conn.table('indexed_triangles').execute()
-    triangles = triangles_df[['node_id_1', 'node_id_2', 'node_id_3']].to_numpy()
+    #     -- Restore original node IDs for indexed triangles
+    #     CREATE OR REPLACE TABLE original_triangles AS
+    #     SELECT
+    #         it.pg_id,
+    #         n1.node_id AS node_id_1,
+    #         n2.node_id AS node_id_2,
+    #         n3.node_id AS node_id_3
+    #     FROM indexed_triangles it
+    #     LEFT JOIN node_element_crosswalk n1 ON it.node_id_1 = n1.idx
+    #     LEFT JOIN node_element_crosswalk n2 ON it.node_id_2 = n2.idx
+    #     LEFT JOIN node_element_crosswalk n3 ON it.node_id_3 = n3.idx;
+    #     """
+    # )
+    # # triangles_df = data_conn.table('indexed_triangles').execute()
+    # # triangles = triangles_df[['node_id_1', 'node_id_2', 'node_id_3']].to_numpy()
+    # triangles_df = data_conn.table('null_filtered_masked_elements').execute()
+    # triangles = triangles_df[['node_id_1', 'node_id_2', 'node_id_3']].to_numpy()
+    # # Process the triangle data in batches
+    # batch_size = 100000
+    # num_batches = len(triangles) // batch_size + (1 if len(triangles) % batch_size != 0 else 0)
     
-    # Process the triangle data in batches
-    batch_size = 100000
-    num_batches = len(triangles) // batch_size + (1 if len(triangles) % batch_size != 0 else 0)
-    
 
-    for batch_num in tqdm(range(num_batches), desc="Processing batches"):
-        start_idx = batch_num * batch_size
-        end_idx = min(start_idx + batch_size, len(triangles))
+    # for batch_num in tqdm(range(num_batches), desc="Processing batches"):
+    #     start_idx = batch_num * batch_size
+    #     end_idx = min(start_idx + batch_size, len(triangles))
         
-        # Get the current batch of triangles
-        batch_triangles = triangles[start_idx:end_idx]
+    #     # Get the current batch of triangles
+    #     batch_triangles = triangles[start_idx:end_idx]
         
-        # Lists to hold results for the current batch
-        weights_raw = []
+    #     # Lists to hold results for the current batch
+    #     weights_raw = []
         
-        for tri_indices in batch_triangles:
-            # Get triangle vertices using the point indices
-            triangle_points_dem = points_dem[tri_indices.astype(int)]
+    #     for tri_indices in batch_triangles:
+    #         # Get triangle vertices using the point indices
+    #         triangle_points_dem = points_dem[tri_indices.astype(int)]
 
-            # Calculate Barycentric weights
-            weights = calculate_barycentric_weights(triangle_points_dem)
-            weights_raw.append(weights)
+    #         # Calculate Barycentric weights
+    #         weights = calculate_barycentric_weights(triangle_points_dem)
+    #         weights_raw.append(weights)
             
         
-        # Save raw weights as well
-        weights_raw_path = os.path.join(output_folder, f'batch_{batch_num}_weights.csv')
-        pd.DataFrame(weights_raw).to_csv(weights_raw_path, index=False, header=False)
+    #     # Save raw weights as well
+    #     weights_raw_path = os.path.join(output_folder, f'batch_{batch_num}_weights.csv')
+    #     pd.DataFrame(weights_raw).to_csv(weights_raw_path, index=False, header=False)
 
-    print("Processing completed. Outputs saved to:", output_folder)
-    del weights_raw, batch_triangles
+    # print("Processing completed. Outputs saved to:", output_folder)
+    # del weights_raw, batch_triangles
     
-    # Stich patches to a single parquet file
-    weights_raw_list = []
+    # # Stich patches to a single parquet file
+    # weights_raw_list = []
 
-    # Read and concatenate weighted centers and raw weights from all batches
-    num_batches = len(os.listdir(output_folder)) // 2 
+    # # Read and concatenate weighted centers and raw weights from all batches
+    # num_batches = len(os.listdir(output_folder)) // 2 
 
-    for batch_num in tqdm(range(num_batches), desc="Processing batches"):
-        # Read raw weights
-        weights_raw_path = os.path.join(output_folder, f'batch_{batch_num}_weights.csv')
-        weights_raw_df = pd.read_csv(weights_raw_path, header=None) 
-        weights_raw_list.append(weights_raw_df)
+    # for batch_num in tqdm(range(num_batches), desc="Processing batches"):
+    #     # Read raw weights
+    #     weights_raw_path = os.path.join(output_folder, f'batch_{batch_num}_weights.csv')
+    #     weights_raw_df = pd.read_csv(weights_raw_path, header=None) 
+    #     weights_raw_list.append(weights_raw_df)
 
-    # Concatenate all batches into single DataFrames
-    final_weights_raw = pd.concat(weights_raw_list, ignore_index=True)
+    # # Concatenate all batches into single DataFrames
+    # final_weights_raw = pd.concat(weights_raw_list, ignore_index=True)
 
 
-    new_column_names = ['node1_weight', 'node2_weight', 'node3_weight']
+    # new_column_names = ['node1_weight', 'node2_weight', 'node3_weight']
 
-    # Assign the new column names to the DataFrame
-    final_weights_raw.columns = new_column_names
+    # # Assign the new column names to the DataFrame
+    # final_weights_raw.columns = new_column_names
 
-    elements_df_combined = pd.concat([triangles_df, final_weights_raw], axis=1)
+    # elements_df_combined = pd.concat([triangles_df, final_weights_raw], axis=1)
     
     # Merge with triangles
     output_path = os.path.join(output_folder, 'bary_weights.parquet')
-    elements_df_combined.to_parquet(output_path, index=False)
+    triangles_df.to_parquet(output_path, index=False)
     data_conn.raw_sql(
         f"""
-        CREATE OR REPLACE TABLE bary_weights AS
+        CREATE OR REPLACE TABLE triangle_weights AS
         SELECT * FROM '{output_path}';
         """
     )
     
     data_conn.raw_sql(
         """
-        CREATE OR REPLACE TABLE triangle_weights AS
-        SELECT
-                el.*,
-                bw.* EXCLUDE (pg_id, node_id_1, node_id_2, node_id_3)
-        FROM 
-            masked_elements AS el
-        LEFT JOIN
-            bary_weights AS bw
-        ON
-            el.pg_id = bw.pg_id;
         -- Update original triangles
         CREATE OR REPLACE TABLE original_triangles AS
         SELECT
                 ot.*,
-                bw.node1_weight, bw.node2_weight, bw.node3_weight
+                tw.node1_weight, tw.node2_weight, tw.node3_weight
         FROM 
             original_triangles AS ot
         LEFT JOIN
-            bary_weights AS bw
+            triangle_weights AS tw
         ON
-            ot.pg_id = bw.pg_id;
+            ot.pg_id = tw.pg_id;
         """
     )
 
@@ -326,7 +353,6 @@ def compute_3d_barycentric(database_path: str, node_table_name: str, element_tab
         """
         INSERT INTO metadata (table_name, crs)
         VALUES 
-            ('bary_weights', 'EPSG:4326'),
             ('triangle_weights', 'EPSG:4326');             
         """
     )
