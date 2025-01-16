@@ -202,7 +202,7 @@ def extract_elevation(s3_path: str, database_path: str) -> gpd.GeoDataFrame([]):
     data_conn.raw_sql(
         f"""
         CREATE OR REPLACE TABLE nodes_elevation AS 
-        SELECT * FROM '{temp_file}'
+        SELECT node_id, long, lat, elevation FROM '{temp_file}'
         """
     )
     os.remove(temp_file)
@@ -210,13 +210,13 @@ def extract_elevation(s3_path: str, database_path: str) -> gpd.GeoDataFrame([]):
     data_conn.con.close()
     return 
 
-def mask_nodes(database_path: str) -> None:
+def mask_nodes(database_path: str, table_name:str, masked_table_name:str) -> None:
     data_conn = ibis.duckdb.connect(database_path)
     data_conn.raw_sql('LOAD spatial')
     data_conn.raw_sql(
-        """
-        CREATE OR REPLACE TABLE masked_nodes AS
-        SELECT * FROM nodes AS n
+        f"""
+        CREATE OR REPLACE TABLE '{masked_table_name}' AS
+        SELECT * FROM '{table_name}' AS n
         WHERE node_id IN (
             SELECT node_id_1 FROM masked_elements
             UNION
@@ -224,6 +224,22 @@ def mask_nodes(database_path: str) -> None:
             UNION
             SELECT node_id_3 FROM masked_elements
         );
+        """
+    )
+    data_conn.con.close()
+    return
+
+def add_elevation(database_path: str, table_name:str, elevation_table:str) -> None:
+    data_conn = ibis.duckdb.connect(database_path)
+    data_conn.raw_sql('LOAD spatial')
+    data_conn.raw_sql(
+        f"""
+        CREATE OR REPLACE TABLE '{table_name}' AS
+        SELECT n.node_id, n.long, n.lat, n.wse, e.elevation
+        FROM '{table_name}' AS n
+        LEFT JOIN '{elevation_table}' AS e
+        ON n.node_id = e.node_id
+        WHERE e.elevation IS NOT NULL;
         """
     )
     data_conn.con.close()
