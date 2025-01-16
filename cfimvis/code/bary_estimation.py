@@ -7,7 +7,7 @@ import rasterio
 import pandas as pd
 import numpy as np
 
-def estimate(database_path: str) -> None:
+def estimate(database_path: str, output_database_path: str) -> None:
     """
     The `estimate` function processes spatial data stored in a DuckDB database to compute 
     weighted centroids and water surface elevation (WSE) for triangular elements. It leverages 
@@ -44,14 +44,15 @@ def estimate(database_path: str) -> None:
     """
 
     data_conn = ibis.duckdb.connect(database_path)
+    out_data_conn = ibis.duckdb.connect(output_database_path)
     try:
-        data_conn.raw_sql('LOAD spatial')
+        out_data_conn.raw_sql('LOAD spatial')
     except: 
-        data_conn.raw_sql('INSTALL spatial')
-        data_conn.raw_sql('LOAD spatial')    
-
+        out_data_conn.raw_sql('INSTALL spatial')
+        out_data_conn.raw_sql('LOAD spatial')    
+    out_data_conn.raw_sql(f"ATTACH '{database_path}' AS compute_db;")
     # Compute WSE based on barycentric weights for all elements
-    data_conn.raw_sql(
+    out_data_conn.raw_sql(
         """
         -- Map node indices to their coordinates and elevation (wse)
         CREATE OR REPLACE TEMP TABLE nodes_data AS 
@@ -60,7 +61,7 @@ def estimate(database_path: str) -> None:
             long,
             lat,
             wse
-        FROM masked_nodes;
+        FROM compute_db.masked_nodes;
 
         -- Join triangle table with node data to get vertex coordinates
         CREATE OR REPLACE TEMP TABLE triangle_vertices AS 
@@ -71,7 +72,7 @@ def estimate(database_path: str) -> None:
             n1.long AS node1_long, n1.lat AS node1_lat, n1.wse AS node1_wse,
             n2.long AS node2_long, n2.lat AS node2_lat, n2.wse AS node2_wse,
             n3.long AS node3_long, n3.lat AS node3_lat, n3.wse AS node3_wse
-        FROM triangle_weights t
+        FROM compute_db.triangle_weights t
         JOIN nodes_data n1 ON t.node_id_1 = n1.node_id 
         JOIN nodes_data n2 ON t.node_id_2 = n2.node_id 
         JOIN nodes_data n3 ON t.node_id_3 = n3.node_id; 
@@ -92,7 +93,7 @@ def estimate(database_path: str) -> None:
             wc.centroid_long,
             wc.centroid_lat,
             wc.wse_weighted_average
-        FROM triangle_weights t
+        FROM compute_db.triangle_weights t
         LEFT JOIN weighted_centroids wc ON t.pg_id = wc.pg_id;
         """
     )
