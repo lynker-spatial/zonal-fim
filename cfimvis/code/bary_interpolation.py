@@ -7,7 +7,7 @@ import rasterio
 import pandas as pd
 import numpy as np
 
-def interpolate(database_path: str, s3_path: str) -> None:
+def interpolate(database_path: str, output_database_path: str, s3_path: str, save_raster: bool=False) -> None:
     """
     The `interpolate` function processes spatial data to generate a raster file representing 
     water surface elevation (WSE) using barycentric interpolation. It produces 
@@ -45,14 +45,18 @@ def interpolate(database_path: str, s3_path: str) -> None:
 
     """
     data_conn = ibis.duckdb.connect(database_path)
-    try:
-        data_conn.raw_sql('LOAD spatial')
-    except: 
-        data_conn.raw_sql('INSTALL spatial')
-        data_conn.raw_sql('LOAD spatial')
+    out_data_conn = ibis.duckdb.connect(output_database_path)
+    for conn in [data_conn, out_data_conn]:
+        try:
+            conn.raw_sql('LOAD spatial')
+        except:
+            conn.raw_sql('INSTALL spatial')
+            conn.raw_sql('LOAD spatial')
 
-    merged_polys = data_conn.table("triangle_barycentric").select(['pg_id', 'wse_weighted_average'])
-    z_w = data_conn.table("z_w").select(['pg_id', 'cell', 'coverage_fraction'])      
+    out_data_conn.raw_sql(f"ATTACH '{database_path}' AS compute_db;")
+
+    merged_polys = out_data_conn.table("triangle_barycentric").select(['pg_id', 'wse_weighted_average'])
+    z_w = data_conn.table("coverage_fraction").select(['pg_id', 'cell', 'coverage_fraction', 'elevation'])      
     
     # left join on the 'pg_id' column
     z_w_merged = z_w.join(merged_polys, z_w.pg_id == merged_polys.pg_id, how='left')
@@ -77,18 +81,35 @@ def interpolate(database_path: str, s3_path: str) -> None:
     z_w_merged = z_w_merged.group_by('cell').aggregate(
         wse_cell_weighted_average=z_w_merged.wse_cell_weighted_average.first()
     )
-    z_w_merged.execute()
 
-    # Load DEM 
-    with rasterio.open("data/DEM_masked_4326.tif") as src:
-        raster_meta = src.meta
-        total_pixels = raster_meta['width'] * raster_meta['height']
-        width = raster_meta['width']
-        height = raster_meta['height']
-    
-    df = pd.DataFrame({'cell': range(1, total_pixels + 1), 'wse_cell_weighted_average': 0})
-    data_conn.register(df, 'cell_range_table') 
-    cell_range_table = data_conn.table('cell_range_table')
+    z_w_cell = (
+        z_w
+        .group_by("cell")  
+        .aggregate(*[z_w[col].first().name(col) for col in z_w.columns if col != "cell"])  # Aggregate all columns except 'cell'
+    )
+
+    z_w_merged = z_w_merged.join(z_w_cell.select(['cell', 'elevation']), z_w_merged.cell == z_w_cell.cell, how='left')
+    z_w_merged = z_w_merged.drop(z_w_merged.cell_right)
+    z_w_merged = z_w_merged.filter(~z_w_merged["elevation"].isnan())
+
+    z_w_with_depth = z_w_merged.mutate(depth=z_w_merged["wse_cell_weighted_average"] - z_w_merged["elevation"])
+
+    # Filter the rows where 'depth' is greater than or equal to 0
+    filtered_z_w = z_w_with_depth.filter(z_w_with_depth["depth"] >= 0)
+    out_data_conn.create_table("depth", filtered_z_w,  overwrite=True)
+
+    if save_raster:
+
+        # Load DEM 
+        with rasterio.open(s3_path) as src:
+            raster_meta = src.meta
+            total_pixels = raster_meta['width'] * raster_meta['height']
+            width = raster_meta['width']
+            height = raster_meta['height']
+        
+        df = pd.DataFrame({'cell': range(1, total_pixels + 1), 'wse_cell_weighted_average': 0})
+        data_conn.register(df, 'cell_range_table') 
+        cell_range_table = data_conn.table('cell_range_table')
 
     # Assuming z_w_merged is already an Ibis table
     z_w_merged_with_missing = cell_range_table.left_join(
@@ -131,6 +152,7 @@ def interpolate(database_path: str, s3_path: str) -> None:
     with rasterio.open(output_path, 'w', **raster_meta) as dst:
         dst.write(raster_array.astype('float32'), 1)
     data_conn.con.close()
+    out_data_conn.con.close()
     return
 
 def make_depth_raster(dem_path: str, wse_path: str = "data/wse_barycentric_interpolation.tif", 

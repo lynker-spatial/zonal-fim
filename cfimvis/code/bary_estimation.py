@@ -99,6 +99,7 @@ def estimate(database_path: str, output_database_path: str) -> None:
     )
 
     data_conn.con.close()
+    out_data_conn.con.close()
     return 
 
 

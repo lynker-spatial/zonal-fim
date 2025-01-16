@@ -28,7 +28,7 @@ def add_point_geo(database_path: str, table_name: str, lat_col_nam: str, long_co
     data_conn.con.close()
     return
 
-def write_to_database(database_path: str, table_name: str, df:pd.DataFrame([])=None, df_path: str=None) -> None:
+def write_to_database(database_path: str, table_name: str, df: pd.DataFrame([])=None, df_path: str=None) -> None:
     """
     Writes data to a database. Accepts either a DataFrame or a file path.
     
