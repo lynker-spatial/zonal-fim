@@ -117,19 +117,21 @@ conda activate coastal_fim_vis
       --preprocess True <br>
      
       ```shell
-      python test_mask.py --generate_mask False --preprocess True --generate_wse False --generate_depth False --zarr_format False  --execute False -u '/path/ElementPolygons.parquet' -o '/path/TBDEM_AtlanticGulf_Mosaic_NWM_3_Revised_v4_COG_4326.tif' -i '/path/agGridfile.gr3' -c '/path/schisim_database.duckdb' -w '/path/coverage_fraction.parquet'
+      python test_mask.py --generate_mask False --preprocess True --generate_wse False --generate_depth False --zarr_format False  --execute False -u '/path/ElementPolygons.parquet' -o '/path/TBDEM_AtlanticGulf_Mosaic_NWM_3_Revised_v4_COG.tif' -i '/path/agGridfile.gr3' -c '/path/schisim_database.duckdb' -w '/path/coverage_fraction.parquet'
       ```
 
 
    
 2. **Run the Barycentric Computation**:
-   Check out notebooks
-
+    General pipeline for executing barycentric interpolation is given that a preprocessing has been done once, we can pass a new .gr3 file and specify the output path. There is an option `--zarr_format` to produce the outputs as zarr instead of a .tif file one does not need to change .tif to .zarr in dpeth and wse inputs this conversion will be done automatically.    
+    
+    ```shell
+    python test_mask.py --generate_mask False --preprocess False --generate_wse False --generate_depth True --zarr_format False  --execute True  --dissolve False -o '/path/TBDEM_AtlanticGulf_Mosaic_NWM_3_Revised_v4_COG_4326.tif' -i '/path/agGridfile.gr3' -c '/path/schisim_database.duckdb' -m '/path/depth_raser_v1.tif' -q '/path/wse_raser_v1.tif'
+    ```
 
 3. **Output**:
-   - Barycentric weights and associated data saved in DuckDB tables and parquet files.
-   - Can write WSE interpolation and depth values as .tif
-
+   - Barycentric interpolation is saved as depth table in the DuckDB database.
+   - Can write WSE interpolation and depth values as .tif and .zarr file if specified. 
 
 ---
 

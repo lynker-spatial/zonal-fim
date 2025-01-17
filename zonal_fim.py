@@ -3,6 +3,7 @@
 
 import argparse
 import time
+import os
 from cfimvis.tools import mask_bounds as mb
 from cfimvis.tools import geometry_manipulation as gm
 from cfimvis.tools import read_schisim as rs
@@ -32,6 +33,8 @@ if __name__ == '__main__':
     parser.add_argument('-b','--zarr_format',help='activates the zarr_format that replaces geotif writing with zarr', required=False, type=str_to_bool, default=True)
     parser.add_argument('-h','--execute',help='activates the execute that runs the pipeline for generating interpolated depth', required=False, type=str_to_bool, default=True)
     parser.add_argument('-o','--dem_path',help='dem_path', required=False, type=str, default='')
+    parser.add_argument('-m','--depth_path',help='depth raster path to save the file to if zarr format is chosen it automatically converts tif extension to zarr  e.g., /data/raster_v1.tif', required=False, type=str, default='')
+    parser.add_argument('-q','--wse_path',help='wse raster path to save the file to if zarr format is chosen it automatically converts tif extension to zarr  e.g., /data/raster_v1.tif', required=False, type=str, default='')
     parser.add_argument('-i','--file_path',help='gr3_file_path',required=False,type=str, default='')
     parser.add_argument('-k','--shape_file_folder_path',help='shape_file_folder_path for schisim elements',required=False,type=str, default='')
     parser.add_argument('-l','--output_folder_path',help='output_folder_path for schisim elements',required=False,type=str, default='')
@@ -55,6 +58,8 @@ if __name__ == '__main__':
     zarr_format = args['zarr_format']
     execute = args['execute']
     dem_path = args['dem_path']
+    depth_path = args['depth_path']
+    wse_path = args['wse_path']
     file_path = args['file_path']
     shape_file_folder_path = args['shape_file_folder_path']
     output_folder_path = args['output_folder_path']
@@ -68,8 +73,11 @@ if __name__ == '__main__':
     nwm_table_name = args['nwm_table_name']
     water_table_name = args['water_table_name']
     dissolve = args['dissolve']
-    print('\n')
 
+    file_name, file_extension = os.path.splitext(dem_path)
+    output_dem_path = f"{file_name}_4326{file_extension}"
+    print('\n')
+    
 
     if generate_mask:
         print('Creating single mask ...')
@@ -83,6 +91,9 @@ if __name__ == '__main__':
 
 
     if preprocess:
+        # Reproject raster
+        print('Reprojecting to EPSG:4326 ...')
+        fd.reproject_dem(dem_path, output_dem_path)
         # Ingest coverage fraction data
         print('Ingesting zonal output file ...')
         gm.write_to_database(database_path, 'coverage_fraction', df_path=zonal_path)
@@ -100,7 +111,7 @@ if __name__ == '__main__':
         print('Added elements crosswalk to duckdb.\n')
         print('Extracting elevation for nodes ...')
         gm.add_point_geo(database_path, 'nodes', 'lat', 'long')
-        gm.extract_elevation(dem_path=dem_path, database_path=database_path)
+        gm.extract_elevation(dem_path=output_dem_path, database_path=database_path)
         print('Elevation extraction complete.\n')
 
 
@@ -150,7 +161,8 @@ if __name__ == '__main__':
         print('\nWriting rasters...')
         start_section_4 = time.time()
         bi.make_wse_depth_rasters(database_path=database_path, dem_path=dem_path,
-                                generate_depth=generate_depth, generate_wse=generate_wse, zarr_format=zarr_format)
+                                    generate_depth=generate_depth, depth_path=depth_path, wse_path=wse_path,
+                                    generate_wse=generate_wse, zarr_format=zarr_format)
         end_section_4 = time.time()
         time_section_4 = end_section_4 - start_section_4
         print(f"Time taken for section 4: {time_section_4:.2f} seconds")
