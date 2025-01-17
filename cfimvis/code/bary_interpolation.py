@@ -6,6 +6,7 @@ from ibis import _
 import rasterio
 import pandas as pd
 import numpy as np
+import zarr
 
 def interpolate(database_path: str) -> None:
     """
@@ -105,7 +106,7 @@ def interpolate(database_path: str) -> None:
 def make_wse_depth_rasters(database_path: str, s3_path: str, generate_wse: bool=False, generate_depth: bool=True,
                            output_depth_path: str='data/output_depth.tif',
                             output_wse_path: str =  "data/output_wse_barycentric_interpolation.tif", 
-                             mask_negative: bool = True) -> None:
+                             zarr_format: bool = True, mask_negative: bool = True) -> None:
     """
     The `make_depth_raster` function calculates a depth raster by computing the difference between 
     a water surface elevation (WSE) raster and a digital elevation model (DEM) raster. The result 
@@ -166,7 +167,7 @@ def make_wse_depth_rasters(database_path: str, s3_path: str, generate_wse: bool=
             output_raster_path = output_wse_path
 
         # Load DEM and depth
-        df = data_conn.table(target).execute()
+        df = data_conn.table('depth').execute()
         # Extract raster metadata
         with rasterio.open(s3_path) as src:
             raster_meta = src.meta
@@ -189,9 +190,16 @@ def make_wse_depth_rasters(database_path: str, s3_path: str, generate_wse: bool=
 
         # Update raster metadata for nodata value
         raster_meta.update(dtype='float32', nodata=nodata_value)
-        # Write the raster array to a GeoTIFF file
-        with rasterio.open(output_raster_path, 'w', **raster_meta) as dst:
-            dst.write(raster_array, 1)  
+        if zarr_format:
+            output_raster_path = output_raster_path.replace('.tif', '.zarr')
+            z = zarr.open(output_raster_path, mode='w', shape=raster_array.shape, 
+                        dtype='float32', chunks=(1000, 1000), fill_value=nodata_value)
+            z[:, :] = raster_array
+        else:
+            # Write the raster array to a GeoTIFF file
+            with rasterio.open(output_raster_path, 'w', **raster_meta) as dst:
+                dst.write(raster_array, 1) 
+        print(f"Saved file to: {output_raster_path}") 
 
     data_conn.con.close()
     # out_data_conn.con.close()
