@@ -16,13 +16,13 @@ pacman::p_load(
 base <- '/Users/mikejohnson/Downloads/coastal_data'
 
 
-gpkg <- glue('{base}/agElementPolygons.gpkg')
-weights_file <- glue('{base}/coverage_fraction.parquet')
+gpkg <- glue('{base}/ElementPolygons.gpkg')
+weights_file <- glue('{base}/ElementPolygons.parquet')
 d <- rast(glue('{base}/TBDEM_AtlanticGulf_Mosaic_NWM_3_Revised_v4_COG_4326.tif'))
 mask_file <- glue("{base}/mask.tif")
 
 # Read and reproject vector data
-gpkg_layer <- 'triangles'
+gpkg_layer <- 'ElementPolygons'
 pg5070 <- st_transform(read_sf(gpkg, gpkg_layer), 5070)
 
 # Create a grid based on the bounding box of the input geometry
@@ -55,7 +55,7 @@ for (i in 1:nrow(tess_small)) {
 
 # Masking out the ocean
 if(!file.exists(mask_file)) {
-  mask <- st_zm(read_sf(gpkg, "overall_mask"))
+  mask <- st_zm(read_sf(gpkg, "mask"))
   f <- fasterize(mask, raster(d))
   writeRaster(f, mask_file, overwrite = TRUE)
 }

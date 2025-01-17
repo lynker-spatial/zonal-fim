@@ -78,12 +78,12 @@ def write_to_database(database_path: str, table_name: str, df: pd.DataFrame([])=
 
 
 
-def get_none_overlapping(s3_path: str, database_path: str, point_gdf_table: str) -> None:
+def get_none_overlapping(dem_path: str, database_path: str, point_gdf_table: str) -> None:
     data_conn = ibis.duckdb.connect(database_path)
     data_conn.raw_sql('LOAD spatial')
 
     # Vectorize raster
-    with rasterio.open(s3_path) as src:
+    with rasterio.open(dem_path) as src:
         raster_crs = src.crs
         mask = src.dataset_mask()
         # Extract shapes from the raster
@@ -155,7 +155,7 @@ def get_none_overlapping(s3_path: str, database_path: str, point_gdf_table: str)
     data_conn.con.close()
     return 
 
-def extract_elevation(s3_path: str, database_path: str) -> gpd.GeoDataFrame([]):
+def extract_elevation(dem_path: str, database_path: str) -> gpd.GeoDataFrame([]):
 
     data_conn = ibis.duckdb.connect(database_path)
     try:
@@ -166,7 +166,7 @@ def extract_elevation(s3_path: str, database_path: str) -> gpd.GeoDataFrame([]):
     point_gdf = data_conn.table("nodes").execute()
     point_gdf = point_gdf.set_crs('EPSG:4326')
 
-    with COGReader(s3_path) as cog:
+    with COGReader(dem_path) as cog:
         raster_crs = cog.dataset.crs
         points_crs = point_gdf.crs
         if points_crs != raster_crs:

@@ -57,8 +57,16 @@ conda activate coastal_fim_vis
 ---
 
 ## Usage
-
+   The script zonal_fim.py performs execution of pipeline for generating barycentric interpolation, generating masks, and preprocessing pipeline 
 1. **Preprocessing and Prepare Input Data**:
+   1. The first step is to generate an overall mask using a set of different masks and the following procedure
+   
+      This can be achieved by executing zonal_fim.py and activating generate_mask flag
+      
+      ```shell
+      python test_mask.py --generate_mask True --preprocess False --generate_wse False --generate_depth False --zarr_format False  --execute False  --dissolve True -b '/path/ElementPolygons.parquet' -o '/path/TBDEM_AtlanticGulf_Mosaic_NWM_3_Revised_v4_COG_4326.tif' -i '/path/agGridfile.gr3' -c '/path/schisim_database.duckdb'  -a '/path/masks.duckdb' -u '/mnt/f/costal_fim/test/traingles.parquet'
+      ```
+
    - visit [preprocessing folder](preprocesing/README.md) for instructions
 
 2. **Run the Barycentric Computation**:

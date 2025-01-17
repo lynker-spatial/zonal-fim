@@ -10,17 +10,27 @@ from cfimvis.tools import zonal_operations as zo
 from cfimvis.code import bary_estimation as be
 from cfimvis.code import bary_interpolation as bi 
 
+def str_to_bool(value):
+    if isinstance(value, bool):
+        return value
+    if value.lower() in {'true', 't', 'yes', 'y', '1'}:
+        return True
+    elif value.lower() in {'false', 'f', 'no', 'n', '0'}:
+        return False
+    else:
+        raise argparse.ArgumentTypeError(f"Invalid boolean value: {value}")
+    
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Build general mask')
-    parser.add_argument('-z','--generate_mask',help='activates the generate_mask as a part of preprocess in case there is a change in masks', required=False, type=bool, default=False)
-    parser.add_argument('-d','--preprocess',help='activates the preprocess if it is the first time this is being executed in the domain', required=False, type=bool, default=False)
-    parser.add_argument('-e','--generate_wse',help='activates the generate_wse to produce a map of WSE', required=False, type=bool, default=False)
-    parser.add_argument('-g','--generate_depth',help='activates the generate_depth to produce a map of Depth', required=False, type=bool, default=True)
-    parser.add_argument('-w','--zarr_format',help='activates the zarr_format that replaces geotif writing with zarr', required=False, type=bool, default=True)
-    parser.add_argument('-o','--s3_path',help='s3_path', required=True, type=str)
+    parser.add_argument('-z','--generate_mask',help='activates the generate_mask as a part of preprocess in case there is a change in masks', required=False, type=str_to_bool, default=False)
+    parser.add_argument('-d','--preprocess',help='activates the preprocess if it is the first time this is being executed in the domain', required=False, type=str_to_bool, default=False)
+    parser.add_argument('-e','--generate_wse',help='activates the generate_wse to produce a map of WSE', required=False, type=str_to_bool, default=False)
+    parser.add_argument('-g','--generate_depth',help='activates the generate_depth to produce a map of Depth', required=False, type=str_to_bool, default=True)
+    parser.add_argument('-b','--zarr_format',help='activates the zarr_format that replaces geotif writing with zarr', required=False, type=str_to_bool, default=True)
+    parser.add_argument('-h','--execute',help='activates the execute that runs the pipeline for generating interpolated depth', required=False, type=str_to_bool, default=True)
+    parser.add_argument('-o','--dem_path',help='dem_path', required=True, type=str)
     parser.add_argument('-i','--file_path',help='gr3_file_path',required=True,type=str)
     parser.add_argument('-c','--database_path',help='Path to the DuckDB database file.',required=True,type=str)
-    parser.add_argument('-b','--output_database_path',help='Path to the DuckDB output database file.',required=True,type=str)
     parser.add_argument('-a','--mask_database_path',help='Path to the mask DuckDB database file.',required=True,type=str)
     parser.add_argument('-u','--triangles_path',help='Path to the file containing the triangles dataset.',required=True,type=str)
     parser.add_argument('-w','--zonal_path',help='Path to the zonal file containing the coverage fractions.',required=True,type=str)
@@ -29,7 +39,7 @@ if __name__ == '__main__':
     parser.add_argument('-x','--levee_table_name',help='Name of the levee data table in the DuckDB database.',required=False,type=str,default='interior_mask_levee_protected_area_conus_atlgulf')
     parser.add_argument('-t','--nwm_table_name',help='Name of the National Water Model table in the DuckDB database.',required=False,type=str, default="interior_mask_nwm_lakes_conus_atlgulf")
     parser.add_argument('-f','--water_table_name',help='Name of the water bodies table in the DuckDB database.',required=False,type=str, default="interior_mask_water_polygon_conus_atlgulf")
-    parser.add_argument('-s','--dissolve',help='Whether to dissolve overlapping geometries at each stage.',required=False,type=bool, default=True)
+    parser.add_argument('-s','--dissolve',help='Whether to dissolve overlapping geometries at each stage.',required=False, type=str_to_bool, default=True)
 
     args = vars(parser.parse_args())
     generate_mask = args['generate_mask']
@@ -37,10 +47,10 @@ if __name__ == '__main__':
     generate_wse = args['generate_wse']
     generate_depth = args['generate_depth']
     zarr_format = args['zarr_format']
-    s3_path = args['s3_path']
+    execute = args['execute']
+    dem_path = args['dem_path']
     file_path = args['file_path']
     database_path = args['database_path']
-    output_database_path = args['output_database_path']
     mask_database_path = args['mask_database_path']
     triangles_path = args['triangles_path']
     zonal_path = args['zonal_path']
@@ -79,20 +89,33 @@ if __name__ == '__main__':
         print('Added elements crosswalk to duckdb.\n')
         print('Extracting elevation for nodes ...')
         gm.add_point_geo(database_path, 'nodes', 'lat', 'long')
-        gm.extract_elevation(s3_path=s3_path, database_path=database_path)
+        gm.extract_elevation(dem_path=dem_path, database_path=database_path)
         print('Elevation extraction complete.\n')
 
-    print('Reading gr3 file...')
-    start_section_1 = time.time()
-    if 'point_df' not in locals() and 'point_df' not in globals():
-        point_df, _, _ = rs.read_gr3(file_path) 
-    gm.write_to_database(database_path, 'nodes', df=point_df) 
-    gm.mask_nodes(database_path, 'nodes', 'masked_nodes') 
-    gm.add_elevation(database_path, 'masked_nodes', 'nodes_elevation')
-    end_section_1 = time.time()
-    time_section_1 = end_section_1 - start_section_1
-    print(f"Time taken for section 1: {time_section_1:.2f} seconds")
-    print('gr3 reading process complete. \n')
+        print('Reading gr3 file...')
+        start_section_1 = time.time()
+        if 'point_df' not in locals() and 'point_df' not in globals():
+            point_df, _, _ = rs.read_gr3(file_path) 
+        gm.write_to_database(database_path, 'nodes', df=point_df) 
+        gm.mask_nodes(database_path, 'nodes', 'masked_nodes') 
+        gm.add_elevation(database_path, 'masked_nodes', 'nodes_elevation')
+        end_section_1 = time.time()
+        time_section_1 = end_section_1 - start_section_1
+        print(f"Time taken for section 1: {time_section_1:.2f} seconds")
+        print('gr3 reading process complete. \n')
+
+    if execute and not preprocess:
+        print('Reading gr3 file...')
+        start_section_1 = time.time()
+        if 'point_df' not in locals() and 'point_df' not in globals():
+            point_df, _, _ = rs.read_gr3(file_path) 
+        gm.write_to_database(database_path, 'nodes', df=point_df) 
+        gm.mask_nodes(database_path, 'nodes', 'masked_nodes') 
+        gm.add_elevation(database_path, 'masked_nodes', 'nodes_elevation')
+        end_section_1 = time.time()
+        time_section_1 = end_section_1 - start_section_1
+        print(f"Time taken for section 1: {time_section_1:.2f} seconds")
+        print('gr3 reading process complete. \n')
     # # _____________________________
 
     if preprocess:
@@ -102,39 +125,40 @@ if __name__ == '__main__':
                                     element_table_name='null_filtered_masked_elements')
         # Output triangle_weights 
         print('Completed barycentric. \n')
+        print('Completed preprocessing. \n')
 
+    if execute:
+        print('Barycentric interpolation...')
+        start_section_2 = time.time()
+        be.estimate(database_path)                 
+        end_section_2 = time.time()
+        time_section_2 = end_section_2 - start_section_2
+        print(f"Time taken for section 2: {time_section_2:.2f} seconds")
+        # output triangle_barycentric
+        print('Completed barycentric interpolation. \n')
 
-    print('Barycentric interpolation...')
-    start_section_2 = time.time()
-    be.estimate(database_path)                 
-    end_section_2 = time.time()
-    time_section_2 = end_section_2 - start_section_2
-    print(f"Time taken for section 2: {time_section_2:.2f} seconds")
-    # output triangle_barycentric
-    print('Completed barycentric interpolation. \n')
+        print('Zonal Interpolation...')
+        start_section_3 = time.time()
+        bi.interpolate(database_path=database_path)
+        end_section_3 = time.time()
+        time_section_3 = end_section_3 - start_section_3
+        print(f"Time taken for section 3: {time_section_3:.2f} seconds")
+        
+        print('\nWriting rasters...')
+        start_section_4 = time.time()
+        bi.make_wse_depth_rasters(database_path=database_path, dem_path=dem_path, 
+                                generate_depth=generate_depth, generate_wse=generate_wse, zarr_format=zarr_format)
+        end_section_4 = time.time()
+        time_section_4 = end_section_4 - start_section_4
+        print(f"Time taken for section 4: {time_section_4:.2f} seconds")
 
-    print('Zonal Interpolation...')
-    start_section_3 = time.time()
-    bi.interpolate(database_path=database_path)
-    end_section_3 = time.time()
-    time_section_3 = end_section_3 - start_section_3
-    print(f"Time taken for section 3: {time_section_3:.2f} seconds")
-    
-    print('\nWriting rasters...')
-    start_section_4 = time.time()
-    bi.make_wse_depth_rasters(database_path=database_path, s3_path=s3_path, 
-                              generate_depth=generate_depth, generate_wse=generate_wse, zarr_format=zarr_format)
-    end_section_4 = time.time()
-    time_section_4 = end_section_4 - start_section_4
-    print(f"Time taken for section 4: {time_section_4:.2f} seconds")
+        total_time = time_section_1 + time_section_2 + time_section_3 + time_section_4
+        total_hours = int(total_time // 3600)
+        total_minutes = int((total_time % 3600) // 60)
+        total_seconds = total_time % 60
 
-    total_time = time_section_1 + time_section_2 + time_section_3 + time_section_4
-    total_hours = int(total_time // 3600)
-    total_minutes = int((total_time % 3600) // 60)
-    total_seconds = total_time % 60
-
-    # Print total time in hours, minutes, and seconds
-    print(f"Total time taken: {total_hours} hours, {total_minutes} minutes, {total_seconds:.2f} seconds")
-    print('Script end.')
+        # Print total time in hours, minutes, and seconds
+        print(f"Total time taken: {total_hours} hours, {total_minutes} minutes, {total_seconds:.2f} seconds")
+        print('Script end.')
 
     

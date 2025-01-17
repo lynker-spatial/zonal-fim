@@ -19,7 +19,7 @@ def interpolate(database_path: str) -> None:
               * `triangle_barycentric`: Includes `pg_id` and `wse_weighted_average`.
               * `z_w`: Maps cells to polygons with `pg_id`, `cell`, and `coverage_fraction`.
 
-        - s3_path (str): 
+        - dem_path (str): 
             The path to a reference GeoTIFF file on the local file system or an S3-compatible 
             storage. This file provides raster dimensions and metadata.
 
@@ -102,7 +102,7 @@ def interpolate(database_path: str) -> None:
     # out_data_conn.con.close()
     return
 
-def make_wse_depth_rasters(database_path: str, s3_path: str, generate_wse: bool=False, generate_depth: bool=True,
+def make_wse_depth_rasters(database_path: str, dem_path: str, generate_wse: bool=False, generate_depth: bool=True,
                            output_depth_path: str='data/output_depth.tif',
                             output_wse_path: str =  "data/output_wse_barycentric_interpolation.tif", 
                              zarr_format: bool = True, mask_negative: bool = True) -> None:
@@ -168,7 +168,7 @@ def make_wse_depth_rasters(database_path: str, s3_path: str, generate_wse: bool=
         # Load DEM and depth
         df = data_conn.table('depth').execute()
         # Extract raster metadata
-        with rasterio.open(s3_path) as src:
+        with rasterio.open(dem_path) as src:
             raster_meta = src.meta
             width = raster_meta['width']
             height = raster_meta['height']
