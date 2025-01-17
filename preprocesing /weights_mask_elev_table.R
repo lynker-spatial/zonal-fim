@@ -1,19 +1,14 @@
 # Load required libraries using pacman
 pacman::p_load(
-  AOI,        # For handling areas of interest
-  sf,         # For spatial vector data manipulation
-  terra,      # For handling raster data
-  raster,     # Needed for fasterize
-  zonal,      # For zonal statistics
-  dplyr,      # For data manipulation
-  fasterize,  # For fast rasterization of vector data
-  arrow,      # For working with Apache Parquet files
-  glue        # For string interpolation
+  hydrofabric,
+  AOI,      # For handling areas of interest
+  raster,   # Needed for fasterize
+  fasterize # For fast rasterization of vector data
 )
 
 # Define file paths:
 # > In this directory, you need the CoastalBathy Grid, the bary_triangles.gpkg
-base <- '/Users/mikejohnson/Downloads/coastal_data'
+base <- '/Users/mikejohnson/hydrofabric/coastal-fim'
 
 
 gpkg <- glue('{base}/ElementPolygons.gpkg')
@@ -56,16 +51,17 @@ for (i in 1:nrow(tess_small)) {
 # Masking out the ocean
 if(!file.exists(mask_file)) {
   mask <- st_zm(read_sf(gpkg, "mask"))
-  f <- fasterize(mask, raster(d))
+  
+  f    <- fasterize(mask, raster(d))
+  
   writeRaster(f, mask_file, overwrite = TRUE)
 }
 
 # Combine elevation data with mask values
 tab <- data.frame(
-  elevation = terra::values(d),
+  elevation = values(d),
   mask = values(rast(mask_file)),
-  cell = 1:ncell(d)
-) |> 
+  cell = 1:ncell(d)) |> 
   setNames(c("elevation", 'mask', "cell"))
 
 # Combine all grid results and join with elevation/mask data
