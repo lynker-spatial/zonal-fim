@@ -3,6 +3,7 @@
 
 import argparse
 import time
+import os
 from cfimvis.tools import mask_bounds as mb
 from cfimvis.tools import geometry_manipulation as gm
 from cfimvis.tools import read_schisim as rs
@@ -72,8 +73,11 @@ if __name__ == '__main__':
     nwm_table_name = args['nwm_table_name']
     water_table_name = args['water_table_name']
     dissolve = args['dissolve']
-    print('\n')
 
+    file_name, file_extension = os.path.splitext(dem_path)
+    output_dem_path = f"{file_name}_4326{file_extension}"
+    print('\n')
+    
 
     if generate_mask:
         print('Creating single mask ...')
@@ -87,6 +91,9 @@ if __name__ == '__main__':
 
 
     if preprocess:
+        # Reproject raster
+        print('Reprojecting to EPSG:4326 ...')
+        fd.reproject_dem(dem_path, output_dem_path)
         # Ingest coverage fraction data
         print('Ingesting zonal output file ...')
         gm.write_to_database(database_path, 'coverage_fraction', df_path=zonal_path)
@@ -104,7 +111,7 @@ if __name__ == '__main__':
         print('Added elements crosswalk to duckdb.\n')
         print('Extracting elevation for nodes ...')
         gm.add_point_geo(database_path, 'nodes', 'lat', 'long')
-        gm.extract_elevation(dem_path=dem_path, database_path=database_path)
+        gm.extract_elevation(dem_path=output_dem_path, database_path=database_path)
         print('Elevation extraction complete.\n')
 
 

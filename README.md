@@ -117,7 +117,7 @@ conda activate coastal_fim_vis
       --preprocess True <br>
      
       ```shell
-      python test_mask.py --generate_mask False --preprocess True --generate_wse False --generate_depth False --zarr_format False  --execute False -u '/path/ElementPolygons.parquet' -o '/path/TBDEM_AtlanticGulf_Mosaic_NWM_3_Revised_v4_COG_4326.tif' -i '/path/agGridfile.gr3' -c '/path/schisim_database.duckdb' -w '/path/coverage_fraction.parquet'
+      python test_mask.py --generate_mask False --preprocess True --generate_wse False --generate_depth False --zarr_format False  --execute False -u '/path/ElementPolygons.parquet' -o '/path/TBDEM_AtlanticGulf_Mosaic_NWM_3_Revised_v4_COG.tif' -i '/path/agGridfile.gr3' -c '/path/schisim_database.duckdb' -w '/path/coverage_fraction.parquet'
       ```
 
 

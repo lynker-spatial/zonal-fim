@@ -6,6 +6,9 @@ from ibis import _
 import geopandas as gpd
 import rasterio
 from pathlib import Path
+import rasterio
+from rasterio.warp import calculate_default_transform, reproject, Resampling
+
 
 
 def convert_elements_file(shape_file_folder_path: str, output_folder_path: str) -> None:
@@ -53,4 +56,43 @@ def exctract_mask(mask_database_path: str, output_folder_path: str) -> None:
     # Write the GeoDataFrame to GeoPackage
     gdf.to_file(geopackage_path, layer='mask', driver="GPKG")
     mask_conn.con.close()
+    return
+
+def reproject_dem(dem_path:str, output_dem_path:str) -> None:
+    # Define the target CRS
+    target_crs = "EPSG:4326"
+    with rasterio.open(dem_path) as src:
+        raster_crs = src.crs
+        # Check if the CRS matches the target CRS
+        if raster_crs == target_crs:
+            print("CRS matches the target CRS.")
+            return
+        else:
+            # Calculate the transform and dimensions for the target CRS
+            transform, width, height = calculate_default_transform(
+                src.crs, target_crs, src.width, src.height, *src.bounds
+            )
+            
+            # Update the metadata to reflect the new CRS
+            profile = src.profile.copy()
+            profile.update({
+                'crs': target_crs,
+                'transform': transform,
+                'width': width,
+                'height': height
+            })
+            
+            # Reproject and save the output raster
+            with rasterio.open(output_dem_path, 'w', **profile) as dst:
+                reproject(
+                    source=rasterio.band(src, 1),  # Input raster's first band
+                    destination=rasterio.band(dst, 1),  # Output raster's first band
+                    src_transform=src.transform,
+                    src_crs=src.crs,
+                    dst_transform=transform,
+                    dst_crs=target_crs,
+                    resampling=Resampling.nearest
+                )
+
+        print(f"Reprojected raster saved at: {output_dem_path}")
     return
