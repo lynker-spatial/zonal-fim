@@ -6,6 +6,7 @@ from ibis import _
 import rasterio
 import numpy as np
 import zarr
+from numcodecs import Blosc, Zlib
 
 def interpolate(database_path: str) -> None:
     """
@@ -188,10 +189,12 @@ def make_wse_depth_rasters(database_path: str, dem_path: str, generate_wse: bool
             raster_array[row_idx, col_idx] = depth_value
 
         # Update raster metadata for nodata value
-        raster_meta.update(dtype='float32', nodata=nodata_value)
+        raster_meta.update(dtype='float32', nodata=nodata_value, compress='deflate')
         if zarr_format:
+            compressor = Zlib(level=9) # For space-saving, use: compressor = Blosc(cname='zstd', clevel=9)
+            
             output_raster_path = output_raster_path.replace('.tif', '.zarr')
-            z = zarr.open(output_raster_path, mode='w', shape=raster_array.shape, 
+            z = zarr.open(output_raster_path, mode='w', shape=raster_array.shape, compressor=compressor,
                         dtype='float32', chunks=(1000, 1000), fill_value=nodata_value)
             z[:, :] = raster_array
         else:
