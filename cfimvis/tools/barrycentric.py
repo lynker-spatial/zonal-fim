@@ -4,15 +4,11 @@ import warnings
 import duckdb
 import ibis
 from ibis import _
-import geopandas as gpd
-import pandas as pd
-from rio_tiler.io import COGReader
-from rio_tiler.errors import PointOutsideBounds
 from tqdm import tqdm
 import numpy as np
 import os
 import shutil
-from collections import defaultdict
+
 
 def calculate_slope(vertex: np.ndarray, other_vertex1: np.ndarray, other_vertex2: np.ndarray) -> float:
     """
