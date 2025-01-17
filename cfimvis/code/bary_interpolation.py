@@ -4,7 +4,6 @@ import duckdb
 import ibis
 from ibis import _
 import rasterio
-import pandas as pd
 import numpy as np
 import zarr
 
