@@ -116,8 +116,10 @@ conda activate coastal_fim_vis
 2. **Run the Barycentric Computation**:
     General pipeline for executing barycentric interpolation is given that a preprocessing has been done once, we can pass a new .gr3 file and specify the output path. There is an option `--zarr_format` to produce the outputs as zarr instead of a .tif file one does not need to change .tif to .zarr in dpeth and wse inputs this conversion will be done automatically.    
     
+    `Note:` make sure that the DEM is in 4326 if not performing preprocessing!
+
     ```shell
-    python zonal_fim.py --generate_mask False --preprocess False --generate_wse False --generate_depth True --zarr_format False  --execute True  --dissolve False -o '/path/TBDEM_AtlanticGulf_Mosaic_NWM_3_Revised_v4_COG_4326.tif' -i '/path/agGridfile.gr3' -c '/path/schisim_database.duckdb' -m '/path/depth_raser_v1.tif' -q '/path/wse_raser_v1.tif'
+    python zonal_fim.py --generate_mask False --preprocess False --generate_wse False --generate_depth True --zarr_format False  --execute True  --dissolve False -i '/path/agGridfile.gr3' -c '/path/schisim_database.duckdb' -m '/path/depth_raser_v1.tif' -q '/path/wse_raser_v1.tif'
     ```
 
 3. **Output**:

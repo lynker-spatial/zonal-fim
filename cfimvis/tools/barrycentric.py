@@ -320,21 +320,21 @@ def compute_3d_barycentric(database_path: str, node_table_name: str, element_tab
         """
     )
     
-    data_conn.raw_sql(
-        """
-        -- Update original triangles
-        CREATE OR REPLACE TABLE original_triangles AS
-        SELECT
-                ot.*,
-                tw.node1_weight, tw.node2_weight, tw.node3_weight
-        FROM 
-            original_triangles AS ot
-        LEFT JOIN
-            triangle_weights AS tw
-        ON
-            ot.pg_id = tw.pg_id;
-        """
-    )
+    # data_conn.raw_sql(
+    #     """
+    #     -- Update original triangles
+    #     CREATE OR REPLACE TABLE original_triangles AS
+    #     SELECT
+    #             ot.*,
+    #             tw.node1_weight, tw.node2_weight, tw.node3_weight
+    #     FROM 
+    #         original_triangles AS ot
+    #     LEFT JOIN
+    #         triangle_weights AS tw
+    #     ON
+    #         ot.pg_id = tw.pg_id;
+    #     """
+    # )
 
     # Save crs info
     data_conn.raw_sql(
