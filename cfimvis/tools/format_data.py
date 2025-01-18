@@ -3,10 +3,12 @@
 import duckdb
 import ibis
 from ibis import _
+import json
 import geopandas as gpd
 import rasterio
 from pathlib import Path
 import rasterio
+from rasterio.crs import CRS
 from rasterio.warp import calculate_default_transform, reproject, Resampling
 
 
@@ -56,6 +58,44 @@ def exctract_mask(mask_database_path: str, output_folder_path: str) -> None:
     # Write the GeoDataFrame to GeoPackage
     gdf.to_file(geopackage_path, layer='mask', driver="GPKG")
     mask_conn.con.close()
+    return
+
+def store_metadata(dem_path: str, database_path: str, table_name: str) -> None:
+    data_conn = ibis.duckdb.connect(database_path)
+    with rasterio.open(dem_path) as src:
+        raster_meta = src.meta
+        width = raster_meta['width']
+        height = raster_meta['height']
+        nodata = raster_meta['nodata']
+        crs = src.crs.to_string() if isinstance(src.crs, CRS) else str(src.crs)
+        transform = raster_meta['transform']  
+        transform_values = list(transform)
+        transform_string = json.dumps(transform_values)
+        meta = 'DEM'
+        table_name = "dem_metadata"
+        # Empty table creation 
+        if table_name not in data_conn.list_tables():
+                data_conn.raw_sql(
+                    f"""
+                    CREATE TABLE IF NOT EXISTS {table_name} (
+                        dem_metadata STRING,
+                        crs STRING,
+                        height INTEGER,
+                        width INTEGER,
+                        nodata FLOAT,
+                        transform STRING
+                    )
+                    """
+                )
+
+        # Data insertion
+        data_conn.raw_sql(
+            f"""
+            INSERT INTO {table_name} (dem_metadata, crs, height, width, nodata, transform)
+            VALUES ('{meta}', '{crs}', {height}, {width}, {nodata}, '{transform_string}');
+            """
+        )
+    data_conn.con.close()
     return
 
 def reproject_dem(dem_path:str, output_dem_path:str) -> None:

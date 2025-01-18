@@ -13,7 +13,6 @@ from cfimvis.tools import zonal_operations as zo
 from cfimvis.code import bary_estimation as be
 from cfimvis.code import bary_interpolation as bi
 
-
 def str_to_bool(value):
     if isinstance(value, bool):
         return value
@@ -49,7 +48,6 @@ if __name__ == '__main__':
     parser.add_argument('-f','--water_table_name',help='Name of the water bodies table in the DuckDB database.',required=False,type=str, default="interior_mask_water_polygon_conus_atlgulf")
     parser.add_argument('-s','--dissolve',help='Whether to dissolve overlapping geometries at each stage.',required=False, type=str_to_bool, default=True)
 
-
     args = vars(parser.parse_args())
     generate_mask = args['generate_mask']
     preprocess = args['preprocess']
@@ -73,9 +71,6 @@ if __name__ == '__main__':
     nwm_table_name = args['nwm_table_name']
     water_table_name = args['water_table_name']
     dissolve = args['dissolve']
-
-    file_name, file_extension = os.path.splitext(dem_path)
-    output_dem_path = f"{file_name}_4326{file_extension}"
     print('\n')
 
     if generate_mask:
@@ -88,11 +83,12 @@ if __name__ == '__main__':
         print('Masking complete. \n')
     # #_____________________________
 
-
     if preprocess:
         # Reproject raster
-        print('Reprojecting to EPSG:4326 ...')
-        fd.reproject_dem(dem_path, output_dem_path)
+        # file_name, file_extension = os.path.splitext(dem_path)
+        # output_dem_path = f"{file_name}_4326{file_extension}"
+        # print('Reprojecting to EPSG:4326 ...')
+        # fd.reproject_dem(dem_path, output_dem_path)
         # Ingest coverage fraction data
         print('Ingesting zonal output file ...')
         gm.write_to_database(database_path, 'coverage_fraction', df_path=zonal_path)
@@ -110,16 +106,18 @@ if __name__ == '__main__':
         print('Added elements crosswalk to duckdb.\n')
         print('Extracting elevation for nodes ...')
         gm.add_point_geo(database_path, 'nodes', 'lat', 'long')
-        gm.extract_elevation(dem_path=output_dem_path, database_path=database_path)
+        gm.extract_elevation(dem_path=dem_path, database_path=database_path) # output_dem_path
         print('Elevation extraction complete.\n')
-
+        print('Storing DEM metadata ...')
+        fd.store_metadata(dem_path=dem_path, database_path=database_path, table_name="dem_metadata") # output_dem_path
+        print('DEM metadata storing complete.\n')
 
     if execute or preprocess:
         print('Reading gr3 file...')
         start_section_1 = time.time()
         if 'point_df' not in locals() and 'point_df' not in globals():
             point_df, _, _ = rs.read_gr3(file_path)
-        gm.write_to_database(database_path, 'nodes', df=point_df)
+            gm.write_to_database(database_path, 'nodes', df=point_df)
         gm.mask_nodes(database_path, 'nodes', 'masked_nodes')
         gm.add_elevation(database_path, 'masked_nodes', 'nodes_elevation')
         end_section_1 = time.time()
@@ -128,16 +126,14 @@ if __name__ == '__main__':
         print('gr3 reading process complete. \n')
     # # _____________________________
 
-
     if preprocess:
-        print('Extracting elevation for nodes and calculating barycentric ...')
+        print('Calculating barycentric ...')
         mb.filter_valid_elements(data_database_path=database_path)
         bc.compute_3d_barycentric(database_path=database_path, node_table_name='masked_nodes',
                                     element_table_name='null_filtered_masked_elements')
         # Output triangle_weights
         print('Completed barycentric. \n')
         print('Completed preprocessing. \n')
-
 
     if execute:
         print('Barycentric interpolation...')
@@ -149,7 +145,6 @@ if __name__ == '__main__':
         # output triangle_barycentric
         print('Completed barycentric interpolation. \n')
 
-
         print('Zonal Interpolation...')
         start_section_3 = time.time()
         bi.interpolate(database_path=database_path)
@@ -159,19 +154,17 @@ if __name__ == '__main__':
        
         print('\nWriting rasters...')
         start_section_4 = time.time()
-        bi.make_wse_depth_rasters(database_path=database_path, dem_path=dem_path,
+        bi.make_wse_depth_rasters(database_path=database_path,
                                     generate_depth=generate_depth, output_depth_path=depth_path, 
                                     output_wse_path=wse_path, generate_wse=generate_wse, zarr_format=zarr_format)
         end_section_4 = time.time()
         time_section_4 = end_section_4 - start_section_4
         print(f"Time taken for section 4: {time_section_4:.2f} seconds")
 
-
         total_time = time_section_1 + time_section_2 + time_section_3 + time_section_4
         total_hours = int(total_time // 3600)
         total_minutes = int((total_time % 3600) // 60)
         total_seconds = total_time % 60
-
 
         # Print total time in hours, minutes, and seconds
         print(f"Total time taken: {total_hours} hours, {total_minutes} minutes, {total_seconds:.2f} seconds")

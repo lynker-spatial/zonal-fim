@@ -4,8 +4,11 @@ import duckdb
 import ibis
 from ibis import _
 import rasterio
+from rasterio.crs import CRS
 import numpy as np
 import zarr
+from affine import Affine
+import json
 from numcodecs import Blosc, Zlib
 
 def interpolate(database_path: str) -> None:
@@ -103,7 +106,7 @@ def interpolate(database_path: str) -> None:
     # out_data_conn.con.close()
     return
 
-def make_wse_depth_rasters(database_path: str, dem_path: str, generate_wse: bool=False, generate_depth: bool=True,
+def make_wse_depth_rasters(database_path: str, generate_wse: bool=False, generate_depth: bool=True,
                            output_depth_path: str='data/output_depth.tif',
                             output_wse_path: str =  "data/output_wse_barycentric_interpolation.tif", 
                              zarr_format: bool = True, mask_negative: bool = True) -> None:
@@ -169,11 +172,28 @@ def make_wse_depth_rasters(database_path: str, dem_path: str, generate_wse: bool
         # Load DEM and depth
         df = data_conn.table('depth').execute()
         # Extract raster metadata
-        with rasterio.open(dem_path) as src:
-            raster_meta = src.meta
-            width = raster_meta['width']
-            height = raster_meta['height']
-        
+        table = data_conn.table('dem_metadata')
+        query = table.filter(table['dem_metadata'] == 'DEM')
+        dem_meta = query.execute()
+        # Reconstruct metadata
+        crs_str = dem_meta['crs'][0]
+        height = int(dem_meta['height'][0])
+        width = int(dem_meta['width'][0])
+        nodata = float(dem_meta['nodata'][0])
+        transform_str = dem_meta['transform'][0]
+        transform_values = json.loads(transform_str)
+        transform = Affine(*transform_values)
+        raster_meta = {
+            'driver': 'GTiff',  
+            'dtype': 'float32',  
+            'nodata': nodata, 
+            'width': width,
+            'height': height,
+            'count': 1,       
+            'crs': CRS.from_string(crs_str),   
+            'transform': transform  
+        }
+    
         # Create an empty raster array filled with NaN
         nodata_value = np.nan
         raster_array = np.full((height, width), nodata_value, dtype=np.float32)
