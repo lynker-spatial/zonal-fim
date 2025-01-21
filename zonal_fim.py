@@ -2,6 +2,7 @@
 
 import argparse
 import time
+import os
 import cfimvis.tools.mask_bounds as mb
 import cfimvis.tools.geometry_manipulation as gm
 import cfimvis.tools.read_schisim as rs
