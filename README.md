@@ -75,9 +75,18 @@ conda activate coastal_fim_vis
 
 ## Usage
    The script zonal_fim.py performs execution of pipeline for generating barycentric interpolation, generating masks, and preprocessing pipeline
+   
 1. **Preprocessing and Prepare Input Data**:
    1. The first step is to generate an overall mask using a set of different masks and the following procedure
-   
+      
+      It implements the following 5 step masking logic
+
+      1. "mask_schism_boundary_atlantic.shp","exterior"
+      2. "mask_state_boundaries_conus.shp","exterior"
+      3. "mask_levee_protected_area_conus.shp","interior"
+      4. "mask_nwm_lakes_conus.shp","interior"
+      5. "mask_water_polygon_conus.shp","interior" 
+      
       This can be achieved by executing zonal_fim.py and activating generate_mask flag while other flags are set to `False` also one can alter the name of masks shapefile names in case they have changed by these flags:
 
       --water_table_name <br>
@@ -90,9 +99,9 @@ conda activate coastal_fim_vis
 
       -k '/path/shape_file_folder' that is the folder path where the schisim element shape file lives <br>
       -l '/path/output_elements_folder' that is the folder path where the schisim element parquet and geopackage will be saved to <br>
-      -a '/path/masks.duckdb' path to the mask databse that will store the generated overall mask <br>
+      -a '/path/masks.duckdb' path to the mask database that will store the generated overall mask <br>
 
-      and there is an optional item to dissolve all geometries into a single multipolygon feature that can be set but recommend the default `True` value
+      and there is an optional item to dissolve all geometries into a single multi-polygon feature that can be set but recommend the default `True` value
 
       --dissolve
 

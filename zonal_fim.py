@@ -84,11 +84,11 @@ if __name__ == '__main__':
 
     if preprocess:
         # Reproject raster
-        file_name, file_extension = os.path.splitext(dem_path)
-        output_dem_path = f"{file_name}_4326{file_extension}"
-        print('Reprojecting to EPSG:4326 ...')
-        fd.reproject_dem(dem_path, output_dem_path)
-        print('Reprojection complete.\n')
+        # file_name, file_extension = os.path.splitext(dem_path)
+        # output_dem_path = f"{file_name}_4326{file_extension}"
+        # print('Reprojecting to EPSG:4326 ...')
+        # fd.reproject_dem(dem_path, output_dem_path)
+        # print('Reprojection complete.\n')
         # Ingest coverage fraction data
         print('Ingesting zonal output file ...')
         gm.write_to_database(database_path, 'coverage_fraction', df_path=zonal_path)
