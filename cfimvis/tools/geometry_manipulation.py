@@ -77,7 +77,6 @@ def write_to_database(database_path: str, table_name: str, df: pd.DataFrame([])=
     return
 
 
-
 def get_none_overlapping(dem_path: str, database_path: str, point_gdf_table: str) -> None:
     data_conn = ibis.duckdb.connect(database_path)
     data_conn.raw_sql('LOAD spatial')
