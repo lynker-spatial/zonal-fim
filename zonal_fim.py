@@ -1,17 +1,15 @@
 # test_mask.py
 
-
 import argparse
 import time
-import os
-from cfimvis.tools import mask_bounds as mb
-from cfimvis.tools import geometry_manipulation as gm
-from cfimvis.tools import read_schisim as rs
-from cfimvis.tools import barrycentric as bc
-from cfimvis.tools import format_data as fd
-from cfimvis.tools import zonal_operations as zo
-from cfimvis.code import bary_estimation as be
-from cfimvis.code import bary_interpolation as bi
+import cfimvis.tools.mask_bounds as mb
+import cfimvis.tools.geometry_manipulation as gm
+import cfimvis.tools.read_schisim as rs
+import cfimvis.tools.barrycentric as bc
+import cfimvis.tools.format_data as fd
+import cfimvis.tools.zonal_operations as zo
+import cfimvis.code.bary_estimation as be
+import cfimvis.code.bary_interpolation as bi
 
 def str_to_bool(value):
     if isinstance(value, bool):
@@ -85,10 +83,11 @@ if __name__ == '__main__':
 
     if preprocess:
         # Reproject raster
-        # file_name, file_extension = os.path.splitext(dem_path)
-        # output_dem_path = f"{file_name}_4326{file_extension}"
-        # print('Reprojecting to EPSG:4326 ...')
-        # fd.reproject_dem(dem_path, output_dem_path)
+        file_name, file_extension = os.path.splitext(dem_path)
+        output_dem_path = f"{file_name}_4326{file_extension}"
+        print('Reprojecting to EPSG:4326 ...')
+        fd.reproject_dem(dem_path, output_dem_path)
+        print('Reprojection complete.\n')
         # Ingest coverage fraction data
         print('Ingesting zonal output file ...')
         gm.write_to_database(database_path, 'coverage_fraction', df_path=zonal_path)
