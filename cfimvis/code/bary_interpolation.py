@@ -21,7 +21,7 @@ def interpolate(database_path: str) -> None:
         - database_path (str): 
             The file path to the DuckDB database containing required spatial data tables:
               * `triangle_barycentric`: Includes `pg_id` and `wse_weighted_average`.
-              * `z_w`: Maps cells to polygons with `pg_id`, `cell`, and `coverage_fraction`.
+              * `z_w`: Maps cells to polygons with `pg_id`, `cell`, and `masked_coverage_fraction`.
 
         - dem_path (str): 
             The path to a reference GeoTIFF file on the local file system or an S3-compatible 
@@ -60,7 +60,7 @@ def interpolate(database_path: str) -> None:
     # out_data_conn.raw_sql(f"ATTACH '{database_path}' AS compute_db;")
 
     merged_polys = data_conn.table("triangle_barycentric").select(['pg_id', 'wse_weighted_average'])
-    z_w = data_conn.table("coverage_fraction").select(['pg_id', 'cell', 'coverage_fraction', 'elevation'])      
+    z_w = data_conn.table("masked_coverage_fraction").select(['pg_id', 'cell', 'coverage_fraction', 'elevation'])      
     
     # left join on the 'pg_id' column
     z_w_merged = z_w.join(merged_polys, z_w.pg_id == merged_polys.pg_id, how='left')

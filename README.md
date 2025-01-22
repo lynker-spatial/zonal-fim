@@ -112,8 +112,7 @@ conda activate coastal_fim_vis
    2. Next step is to generate coverage fractions from zonal in R
       - visit [preprocessing folder](preprocesing/README.md) for instructions
 
-
-   3. Final step in preprocessing is to generate barycentric weights for all none-masked schisim node. This can be done by calling  the script with the following configuration.
+   3. Final step in preprocessing is to generate barycentric weights for all none-masked schisim node. This can be done by calling the script with the following configuration.
 
       Setting all flags to `False` except for <br>
       --preprocess True <br>
@@ -123,12 +122,16 @@ conda activate coastal_fim_vis
       ```
    
 2. **Run the Barycentric Computation**:
-    General pipeline for executing barycentric interpolation is given that a preprocessing has been done once, we can pass a new .gr3 file and specify the output path. There is an option `--zarr_format` to produce the outputs as zarr instead of a .tif file one does not need to change .tif to .zarr in dpeth and wse inputs this conversion will be done automatically.    
+    General pipeline for executing barycentric interpolation is given that a preprocessing has been done once, we can pass a new .gr3 file, the path to schisim_database.duckdb, and specify the output path. 
+
+    Ensure `--execute True`.
     
-    `Note:` make sure that the DEM is in 4326 if not performing preprocessing!
+    There is an option `--zarr_format` to produce the outputs as zarr instead of a .tif file and one does not need to change .tif to .zarr in depth and wse inputs this conversion will be done automatically.  
+    
+    if `--generate_wse False` there is no need to specify a path got `-q`
 
     ```shell
-    python zonal_fim.py --generate_mask False --preprocess False --generate_wse False --generate_depth True --zarr_format False  --execute True  --dissolve False -i '/path/agGridfile.gr3' -c '/path/schisim_database.duckdb' -m '/path/depth_raser_v1.tif' -q '/path/wse_raser_v1.tif'
+    python zonal_fim.py --generate_mask False --preprocess False --generate_wse True --generate_depth True --zarr_format False  --execute True  --dissolve False -i '/path/agGridfile.gr3' -c '/path/schisim_database.duckdb' -m '/path/depth_raser_v1.tif' -q '/path/wse_raser_v1.tif'
     ```
 
 3. **Output**:
@@ -136,32 +139,6 @@ conda activate coastal_fim_vis
    - Can write WSE interpolation and depth values as .tif and .zarr file if specified. 
 
 ---
-
-
-## Preprocessing Workflow
-
-
-1. **Setup Databases**:
-   - Convert files to DuckDB
-
-
-2. **Data Validation**:
-   - Ensure CRS consistency across input datasets.
-   - Validate node and element data for missing values.
-
-
-3. **Pre-Processing**:
-   - Use the provided tools to recompute any pt pre-processing steps as needed
-
-
-4. **Post-Processing**:
-   - Perform barycentric interpolation
-
-
----
-
-
-
 
 ## Testing
 
@@ -187,15 +164,12 @@ conda activate coastal_fim_vis
    - Barycentric computations.
    - Batch processing for DEM and zonal data.
 2. **Next Steps**:
-   - Re-index cell IDs globally to match the original DEM.
+   - Function descriptions
    - Write comprehensive tests for the package.
-
 
 ---
 
-
 ## Report
-
 
 Detailed documentation and implementation notes are available in the report:
 [Report Link](https://docs.google.com/document/d/1DoPeE0IRVHkjqabqTUaX5aWCnPZn9Mdv/edit?usp=sharing&ouid=110666552849114372265&rtpof=true&sd=true)
