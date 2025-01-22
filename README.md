@@ -86,6 +86,10 @@ conda activate coastal_fim_vis
       3. "mask_levee_protected_area_conus.shp","interior"
       4. "mask_nwm_lakes_conus.shp","interior"
       5. "mask_water_polygon_conus.shp","interior" 
+
+      A sample of folder path containing different masks:
+
+      ![output](assets/images/masks_zip.png)
       
       This can be achieved by executing zonal_fim.py and activating generate_mask flag while other flags are set to `False` also one can alter the name of masks shapefile names in case they have changed by these flags:
 
@@ -110,7 +114,7 @@ conda activate coastal_fim_vis
       ```
      
    2. Next step is to generate coverage fractions from zonal in R
-      - visit [preprocessing folder](preprocesing/README.md) for instructions
+      - visit ![preprocessing folder](preprocesing/README.md) for instructions
 
    3. Final step in preprocessing is to generate barycentric weights for all none-masked schisim node. This can be done by calling the script with the following configuration.
 
@@ -133,6 +137,9 @@ conda activate coastal_fim_vis
     ```shell
     python zonal_fim.py --generate_mask False --preprocess False --generate_wse True --generate_depth True --zarr_format False  --execute True  --dissolve False -i '/path/agGridfile.gr3' -c '/path/schisim_database.duckdb' -m '/path/depth_raser_v1.tif' -q '/path/wse_raser_v1.tif'
     ```
+    A sample output of depth raster:
+
+    ![output](assets/images/depth_output.png)
 
 3. **Output**:
    - Barycentric interpolation is saved as depth table in the DuckDB database.
