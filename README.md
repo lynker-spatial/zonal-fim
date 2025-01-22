@@ -139,6 +139,7 @@ conda activate coastal_fim_vis
     ```
     A sample output of depth raster:
 
+    ![shell](assets/images/execution.png)
     ![output](assets/images/depth_output.png)
 
 3. **Output**:
