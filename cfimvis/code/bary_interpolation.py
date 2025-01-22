@@ -10,6 +10,7 @@ import zarr
 from affine import Affine
 import json
 from numcodecs import Blosc, Zlib
+# from osgeo import gdal, osr
 
 def interpolate(database_path: str) -> None:
     """
@@ -109,7 +110,7 @@ def interpolate(database_path: str) -> None:
 def make_wse_depth_rasters(database_path: str, generate_wse: bool=False, generate_depth: bool=True,
                            output_depth_path: str='data/output_depth.tif',
                             output_wse_path: str =  "data/output_wse_barycentric_interpolation.tif", 
-                             zarr_format: bool = True, mask_negative: bool = True) -> None:
+                             zarr_format: bool = True) -> None:
     """
     The `make_depth_raster` function calculates a depth raster by computing the difference between 
     a water surface elevation (WSE) raster and a digital elevation model (DEM) raster. The result 
@@ -122,10 +123,6 @@ def make_wse_depth_rasters(database_path: str, generate_wse: bool=False, generat
         - wse_path (str, optional): 
             File path to the WSE raster file. The default value is 
             "data/wse_barycentric_interpolation.tif". This raster represents water surface elevation.
-
-        - mask_negative (bool, optional): 
-            If True, negative values in the resulting depth raster are masked (set to `NaN`). 
-            Default is True.
 
     Output:
         - None: 
@@ -199,15 +196,35 @@ def make_wse_depth_rasters(database_path: str, generate_wse: bool=False, generat
         raster_array = np.full((height, width), nodata_value, dtype=np.float32)
 
         # Map cell IDs to raster indices and fill the raster array
-        for _, row in df.iterrows():
-            cell_id = int(row['cell'])
-            depth_value = row[target]
-            
-            row_idx = int((cell_id - 1) // width) 
-            col_idx = int((cell_id - 1) % width)  
+        df['row_idx'] = ((df['cell'] - 1) // width).astype(int)
+        df['col_idx'] = ((df['cell'] - 1) % width).astype(int)
+        raster_array[df['row_idx'].values, df['col_idx'].values] = df[target].values
 
-            raster_array[row_idx, col_idx] = depth_value
+        # gdal_wirte = True
+        # if gdal_wirte:
+        #     driver = gdal.GetDriverByName("GTiff")
+        #     dataset = driver.Create(
+        #         output_raster_path,
+        #         raster_meta.get('width'),
+        #         raster_meta.get('height'),
+        #         raster_meta.get('count'),  
+        #         raster_meta.get('dtype'),
+        #         options=["COMPRESS=DEFLATE"]  # Enable Deflate compression
+        #     )
+        #     dataset.SetGeoTransform(raster_meta.get('transform'))
+        #     # Set the projection (CRS)
+        #     srs = osr.SpatialReference()
+        #     srs.ImportFromEPSG(int(crs_str.split(":")[1])) 
+        #     dataset.SetProjection(srs.ExportToWkt())
+        #     # Write the array to the first band
+        #     band = dataset.GetRasterBand(1)
+        #     band.WriteArray(raster_array)
 
+        #     # Set no data value
+        #     band.SetNoDataValue(raster_meta.get('nodata'))
+        #     band.FlushCache()
+        #     dataset = None
+        # else:
         # Update raster metadata for nodata value
         raster_meta.update(dtype='float32', nodata=nodata_value, compress='deflate')
         if zarr_format:
