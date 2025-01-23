@@ -4,6 +4,7 @@ import ibis
 from ibis import _
 import pandas as pd
 import geopandas as gpd
+import xarray as xr
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Tuple
@@ -137,6 +138,61 @@ def read_gr3(file_path: str) -> Tuple[pd.DataFrame, pd.DataFrame, List[List[str]
 
     return nodes_df, elements_df, extra_lines
 
+def read_netcdf(file_path :str) -> pd.DataFrame: 
+    """
+    Reads a .nc file using xarray and converts it to a pandas DataFrame.
+
+    Args:
+        file_path (str): The path to the .nc file.
+
+    Returns:
+        pandas.DataFrame: A DataFrame containing the data.
+                           Returns None if there are issues reading the file.
+    """
+    try:
+        ds = xr.open_dataset(file_path)
+        # Print dataset info for exploration
+        print(f"model TITLE: {ds.TITLE}") 
+        print(f"Conventions: {ds.Conventions}") 
+        print(f"code version: {ds.code_version}") 
+        print(f"NWM version numbere: {ds.NWM_version_number}") 
+        print(f"model output type: {ds.model_output_type}") 
+        print(f"model configuration: {ds.model_configuration}") 
+        print(f"model total valid times: {ds.model_total_valid_times}") 
+        print(f"model nitialization time: {ds.model_initialization_time}") 
+        print(f"model output_valid time: {ds.model_output_valid_time}") 
+        selected_variables = ['SCHISM_hgrid_node_x', 'SCHISM_hgrid_node_y', 'elevation'] 
+
+        # Drop variables that aren't in the dataset, warning the user.
+        valid_variables = [v for v in selected_variables if v in ds]
+        invalid_variables = set(selected_variables) - set(valid_variables)
+        if invalid_variables:
+            print(f"Warning: The following variables were not found in the dataset: {invalid_variables}")
+
+        if not valid_variables:
+            print("No valid variables were selected, returning an empty DataFrame.")
+            return pd.DataFrame()
+
+        # Select the variables from the Dataset
+        ds_selected = ds[valid_variables]
+        df = ds_selected.to_dataframe()
+
+        # Create the node-index and rename appropriately
+        df = df.reset_index()
+        df.rename(columns={'nSCHISM_hgrid_node': 'node_id', 'SCHISM_hgrid_node_x': 'long', 
+                           'SCHISM_hgrid_node_y': 'lat', 'elevation': 'wse'}, inplace=True)
+        df.pop('time')
+        df['node_id'] += 1
+
+        return df
+
+    except FileNotFoundError:
+        print(f"Error: File not found at path: {file_path}")
+        return None
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return None
+    
 def index_triangles(triangles_path: str) -> None:
     triangle_shapes = gpd.read_parquet(triangles_path)
     triangle_shapes.rename(columns={'FID': 'pg_id'}, inplace=True)
