@@ -78,7 +78,9 @@ conda activate coastal_fim_vis
 
    
 1. **Run the Barycentric Computation**:
-    General pipeline for executing barycentric interpolation is given that a preprocessing has been done once, we can pass a new .gr3 file, the path to schisim_database.duckdb, and specify the output path. 
+    General pipeline for executing barycentric interpolation is given that a preprocessing has been done once, we can pass a new .gr3 or .nc file, the path to schisim_database.duckdb, and specify the output path. 
+   
+   `-i '/path/agGridfile.gr3'` or `-i '/path/nwm.t05z.analysis_assim_coastal.total_water.tm02.atlgulf.nc'`
 
     Ensure `--execute True`.
     
