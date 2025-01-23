@@ -126,8 +126,8 @@ if __name__ == '__main__':
         gm.add_elevation(database_path, 'masked_nodes', 'nodes_elevation')
         end_section_1 = time.time()
         time_section_1 = end_section_1 - start_section_1
-        print('reading process complete. \n')
-        print(f"Time taken for section 1: {time_section_1:.2f} seconds")
+        print('reading process complete.')
+        print(f"Time taken for section 1: {time_section_1:.2f} seconds\n")
     # # _____________________________
 
     if preprocess:
@@ -146,16 +146,16 @@ if __name__ == '__main__':
         end_section_2 = time.time()
         time_section_2 = end_section_2 - start_section_2
         # output triangle_barycentric
-        print('Completed barycentric interpolation. \n')
-        print(f"Time taken for section 2: {time_section_2:.2f} seconds")
+        print('Completed barycentric interpolation.')
+        print(f"Time taken for section 2: {time_section_2:.2f} seconds \n")
 
         print('Zonal Interpolation...')
         start_section_3 = time.time()
         bi.interpolate(database_path=database_path)
         end_section_3 = time.time()
         time_section_3 = end_section_3 - start_section_3
-        print('Completed zonal interpolation. \n')
-        print(f"Time taken for section 3: {time_section_3:.2f} seconds")
+        print('Completed zonal interpolation.')
+        print(f"Time taken for section 3: {time_section_3:.2f} seconds \n")
        
         print('\nWriting rasters...')
         start_section_4 = time.time()
@@ -164,7 +164,7 @@ if __name__ == '__main__':
                                     output_wse_path=wse_path, generate_wse=generate_wse, zarr_format=zarr_format)
         end_section_4 = time.time()
         time_section_4 = end_section_4 - start_section_4
-        print('Completed writing rasters. \n')
+        print('Completed writing rasters.')
         print(f"Time taken for section 4: {time_section_4:.2f} seconds\n")
 
         total_time = time_section_1 + time_section_2 + time_section_3 + time_section_4
@@ -175,7 +175,4 @@ if __name__ == '__main__':
         # Print total time in hours, minutes, and seconds
         print(f"Total time taken: {total_hours} hours, {total_minutes} minutes, {total_seconds:.2f} seconds")
         print('Script end.')
-
-
-   
 
