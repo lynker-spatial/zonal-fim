@@ -74,58 +74,10 @@ conda activate coastal_fim_vis
 
 
 ## Usage
-   The script zonal_fim.py performs execution of pipeline for generating barycentric interpolation, generating masks, and preprocessing pipeline
+   The script zonal_fim.py performs execution of pipeline for generating barycentric interpolation, generating masks, and preprocessing pipeline 
+
    
-1. **Preprocessing and Prepare Input Data**:
-   1. The first step is to generate an overall mask using a set of different masks and the following procedure
-      
-      It implements the following 5 step masking logic
-
-      1. "mask_schism_boundary_atlantic.shp","exterior"
-      2. "mask_state_boundaries_conus.shp","exterior"
-      3. "mask_levee_protected_area_conus.shp","interior"
-      4. "mask_nwm_lakes_conus.shp","interior"
-      5. "mask_water_polygon_conus.shp","interior" 
-
-      A sample of folder path containing different masks:
-
-      ![output](assets/images/masks_zip.png)
-      
-      This can be achieved by executing zonal_fim.py and activating generate_mask flag while other flags are set to `False` also one can alter the name of masks shapefile names in case they have changed by these flags:
-
-      --water_table_name <br>
-      --nwm_table_name <br>
-      --levee_table_name <br>
-      --state_table_name <br>
-      --schisim_table_name <br>
-
-      Several paths must be specified including:
-
-      -k '/path/shape_file_folder' that is the folder path where the schisim element shape file lives <br>
-      -l '/path/output_elements_folder' that is the folder path where the schisim element parquet and geopackage will be saved to <br>
-      -a '/path/masks.duckdb' path to the mask database that will store the generated overall mask <br>
-
-      and there is an optional item to dissolve all geometries into a single multi-polygon feature that can be set but recommend the default `True` value
-
-      --dissolve
-
-      ```shell
-      python zonal_fim.py --generate_mask True --preprocess False --generate_wse False --generate_depth False --zarr_format False  --execute False  --dissolve True -k '/path/shape_file_folder' -l '/path/output_elements_folder' -a '/path/masks.duckdb' -p 'exterior_mask_schism_boundary_atlantic_buffer_atlgulf' -n 'exterior_mask_state_boundaries_conus_atlgulf' -x 'interior_mask_levee_protected_area_conus_atlgulf' -t 'interior_mask_nwm_lakes_conus_atlgulf' -f 'interior_mask_water_polygon_conus_atlgulf'
-      ```
-     
-   2. Next step is to generate coverage fractions from zonal in R
-      - visit ![preprocessing folder](preprocesing/README.md) for instructions
-
-   3. Final step in preprocessing is to generate barycentric weights for all none-masked schisim node. This can be done by calling the script with the following configuration.
-
-      Setting all flags to `False` except for <br>
-      --preprocess True <br>
-     
-      ```shell
-      python zonal_fim.py --generate_mask False --preprocess True --generate_wse False --generate_depth False --zarr_format False  --execute False -u '/path/ElementPolygons.parquet' -o '/path/TBDEM_AtlanticGulf_Mosaic_NWM_3_Revised_v4_COG.tif' -i '/path/agGridfile.gr3' -c '/path/schisim_database.duckdb' -w '/path/coverage_fraction.parquet'
-      ```
-   
-2. **Run the Barycentric Computation**:
+1. **Run the Barycentric Computation**:
     General pipeline for executing barycentric interpolation is given that a preprocessing has been done once, we can pass a new .gr3 file, the path to schisim_database.duckdb, and specify the output path. 
 
     Ensure `--execute True`.
@@ -135,18 +87,23 @@ conda activate coastal_fim_vis
     if `--generate_wse False` there is no need to specify a path got `-q`
 
     ```shell
-    python zonal_fim.py --generate_mask False --preprocess False --generate_wse True --generate_depth True --zarr_format False  --execute True  --dissolve False -i '/path/agGridfile.gr3' -c '/path/schisim_database.duckdb' -m '/path/depth_raser_v1.tif' -q '/path/wse_raser_v1.tif'
+    python zonal_fim.py --generate_mask False --preprocess False --generate_wse True --generate_depth True --zarr_format False  --execute True  --dissolve False -i '/path/agGridfile.gr3' -c '/path/zonal_database.duckdb' -m '/path/depth_raser_v1.tif' -q '/path/wse_raser_v1.tif'
     ```
     A sample output of depth raster:
 
     ![shell](assets/images/execution.png)
     ![output](assets/images/depth_output.png)
 
-3. **Output**:
+2. **Output**:
    - Barycentric interpolation is saved as depth table in the DuckDB database.
    - Can write WSE interpolation and depth values as .tif and .zarr file if specified. 
 
 ---
+
+## Preprocessing Workflow
+
+- visit ![preprocessing folder](preprocesing/README.md) for preprocessing instructions
+
 
 ## Testing
 
