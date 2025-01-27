@@ -10,24 +10,40 @@ from pathlib import Path
 import rasterio
 from rasterio.crs import CRS
 from rasterio.warp import calculate_default_transform, reproject, Resampling
+import zipfile
+import io
 
 
 
-def convert_elements_file(shape_file_folder_path: str, output_folder_path: str) -> None:
+def convert_elements_file(zip_file_path: str, output_folder_path: str, save_parqeut: bool=True) -> None:
     """
-    Converts a shapefile containing elements to  parquet, and gpkg files.
-    
+    Unzips a shapefile zip file and saves the contents to the output folder.
+
     Args:
-        shape_file_folder_path (str): Path to the shapefile folder.
-        output_folder_path (str): Path to save the output folder.
-    """
-    gdf_polys = gpd.read_file(shape_file_folder_path)
+        zip_file_path (str): The file path to the zip file containing the shapefile.
+        output_folder_path (str): The folder path where the shapefile contents will be saved.
 
-    # Write the GeoDataFrame as a GeoParquet file
-    gdf_polys.to_parquet(output_folder_path+"/ElementPolygons.parquet", engine="pyarrow", index=False)
-    # Write the GeoDataFrame as a Geopackage file
-    gdf_polys.to_file(output_folder_path+"/ElementPolygons.gpkg", driver="GPKG", layer='ElementPolygons')
+    Functionality:
+        - Extracts the contents of the zip file to the specified output folder.
+
+    Returns:
+        None
+    """
+    with zipfile.ZipFile(zip_file_path, 'r') as z:
+        # Find the shapefile in the zip
+        shapefile_name = [name for name in z.namelist() if name.endswith('.shp')][0]
+        
+        # Read the shapefile into a GeoDataFrame
+        with z.open(shapefile_name) as shp:
+            with io.BytesIO(shp.read()) as shp_bytes:
+                gdf = gpd.read_file(shp_bytes)
+
+        # Save the GeoDataFrame to a GeoPackage file
+        gdf.to_file(output_folder_path+'/ElementPolygons.gpkg', layer="ElementPolygons", driver='GPKG')
+        if save_parqeut:
+            gdf.to_parquet(output_folder_path+'/agElementPolygons.parquet', engine='pyarrow', index=False)
     return
+
 
 def exctract_mask(mask_database_path: str, output_folder_path: str) -> None:
     """
