@@ -5,6 +5,7 @@ import ibis
 from ibis import _
 import json
 import geopandas as gpd
+import pandas as pd 
 import rasterio
 from pathlib import Path
 import rasterio
@@ -12,7 +13,7 @@ from rasterio.crs import CRS
 from rasterio.warp import calculate_default_transform, reproject, Resampling
 import zipfile
 import io
-
+import os
 
 
 def convert_elements_file(zip_file_path: str, output_folder_path: str, save_parqeut: bool=True) -> None:
@@ -151,4 +152,38 @@ def reproject_dem(dem_path:str, output_dem_path:str) -> None:
                 )
 
         print(f"Reprojected raster saved at: {output_dem_path}")
+    return
+
+def setup_crosswalk_table(database_path: str, node_id_path: str) -> None:
+    data_conn = ibis.duckdb.connect(database_path)
+
+    
+    cross_walk = pd.read_csv(node_id_path)
+    cross_walk.rename(columns={'1': 'node_id_gr3'}, inplace=True)
+    cross_walk.reset_index(inplace=True)
+    cross_walk.rename(columns={'index': 'node_id_nc'}, inplace=True)
+
+    temp_file = None
+
+    directory = 'temp'
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+    temp_file = os.path.join(directory, 'temp.parquet')
+    cross_walk.to_parquet(temp_file, index=False)
+    del cross_walk
+
+    # Create crosswalk table
+    data_conn.raw_sql(
+        f"""
+        CREATE OR REPLACE TABLE node_cross_walk AS
+        SELECT * FROM '{temp_file}'
+        """
+    )
+
+    # Clean up temporary file and directory
+    if temp_file:
+        os.remove(temp_file)
+        os.rmdir(directory)
+
+    data_conn.con.close()
     return

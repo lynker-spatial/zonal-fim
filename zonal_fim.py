@@ -35,6 +35,7 @@ if __name__ == '__main__':
     parser.add_argument('-q','--wse_path',help='wse raster path to save the file to if zarr format is chosen it automatically converts tif extension to zarr  e.g., /data/raster_v1.tif', required=False, type=str, default='')
     parser.add_argument('-i','--file_path',help='gr3_file_path',required=False,type=str, default='')
     parser.add_argument('-k','--shape_file_folder_path',help='shape_file_folder_path for schisim elements',required=False,type=str, default='')
+    parser.add_argument('-v','--node_id_path',help='node_id_path for schisim node mapping from gr3 to nc',required=False,type=str, default='')
     parser.add_argument('-l','--output_folder_path',help='output_folder_path for schisim elements',required=False,type=str, default='')
     parser.add_argument('-c','--database_path',help='Path to the DuckDB database file.',required=False,type=str, default='')
     parser.add_argument('-a','--mask_database_path',help='Path to the mask DuckDB database file.',required=False,type=str, default='')
@@ -59,6 +60,7 @@ if __name__ == '__main__':
     wse_path = args['wse_path']
     file_path = args['file_path']
     shape_file_folder_path = args['shape_file_folder_path']
+    node_id_path = args['node_id_path']
     output_folder_path = args['output_folder_path']
     database_path = args['database_path']
     mask_database_path = args['mask_database_path']
@@ -90,6 +92,9 @@ if __name__ == '__main__':
         # fd.reproject_dem(dem_path, output_dem_path)
         # print('Reprojection complete.\n')
         # Ingest coverage fraction data
+        print('Ingesting node ids ...')
+        fd.setup_crosswalk_table(database_path, node_id_path)
+        print('Added node crosswalk to duckdb.\n')
         print('Ingesting zonal output file ...')
         gm.write_to_database(database_path, 'coverage_fraction', df_path=zonal_path)
         zo.filter_masked(database_path)
