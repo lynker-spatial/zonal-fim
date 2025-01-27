@@ -39,6 +39,9 @@ def convert_elements_file(zip_file_path: str, output_folder_path: str, save_parq
             with io.BytesIO(shp.read()) as shp_bytes:
                 gdf = gpd.read_file(shp_bytes)
 
+        # Rename the column elementID to pg_id and select only the pg_id and geometry columns
+        gdf = gdf.rename(columns={'elementID': 'pg_id'})
+        gdf = gdf[['pg_id', 'geometry']]
         # Save the GeoDataFrame to a GeoPackage file
         gdf.to_file(output_folder_path+'/ElementPolygons.gpkg', layer="ElementPolygons", driver='GPKG')
         if save_parqeut:
@@ -156,7 +159,6 @@ def reproject_dem(dem_path:str, output_dem_path:str) -> None:
 
 def setup_crosswalk_table(database_path: str, node_id_path: str) -> None:
     data_conn = ibis.duckdb.connect(database_path)
-
     
     cross_walk = pd.read_csv(node_id_path)
     cross_walk.rename(columns={'1': 'node_id_gr3'}, inplace=True)

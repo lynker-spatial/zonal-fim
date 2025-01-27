@@ -193,6 +193,27 @@ def read_netcdf(file_path :str) -> pd.DataFrame:
         print(f"An error occurred: {e}")
         return None
     
+def crosswalk_nodes(database_path: str) -> None:
+    """
+    Perform cross walk between nc and gr3 file using node cross walk tables.
+    """
+    data_conn = ibis.duckdb.connect(database_path)
+    data_conn.raw_sql(
+        """
+        SELECT 
+            nodes.node_id AS original_id,
+            nodes.*, 
+            node_cross_walk.node_id_gr3 AS node_id,
+            node_cross_walk.*
+        FROM
+            nodes
+        LEFT JOIN node_cross_walk
+        ON nodes.original_id = node_cross_walk.node_id_nc;
+        """
+    )
+    data_conn.con.close()
+    return
+    
 def index_triangles(triangles_path: str) -> None:
     triangle_shapes = gpd.read_parquet(triangles_path)
     triangle_shapes.rename(columns={'FID': 'pg_id'}, inplace=True)
