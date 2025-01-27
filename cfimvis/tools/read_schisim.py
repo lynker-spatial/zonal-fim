@@ -200,15 +200,21 @@ def crosswalk_nodes(database_path: str) -> None:
     data_conn = ibis.duckdb.connect(database_path)
     data_conn.raw_sql(
         """
+        CREATE OR REPLACE TABLE nodes AS
         SELECT 
-            nodes.node_id AS original_id,
-            nodes.*, 
-            node_cross_walk.node_id_gr3 AS node_id,
-            node_cross_walk.*
-        FROM
-            nodes
-        LEFT JOIN node_cross_walk
-        ON nodes.original_id = node_cross_walk.node_id_nc;
+            joined.node_id AS original_id,
+            joined.node_id_gr3 AS node_id,
+            joined.long,
+            joined.lat,
+            joined.wse
+        FROM (
+            SELECT
+                nodes.*,
+                node_cross_walk.*,
+            FROM nodes
+            LEFT JOIN node_cross_walk
+            ON nodes.node_id = node_cross_walk.node_id_nc
+        ) AS joined;
         """
     )
     data_conn.con.close()

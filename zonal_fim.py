@@ -123,61 +123,65 @@ if __name__ == '__main__':
             if file_path.endswith('.nc'):
                 print('Reading .nc file...')
                 point_df = rs.read_netcdf(file_path)
+                gm.write_to_database(database_path, 'nodes', df=point_df)
+                print('Crosswalking nodes...')
+                rs.crosswalk_nodes(database_path)
             else:
                 print('Reading .gr3 file...')
                 point_df, _, _ = rs.read_gr3(file_path)
-            gm.write_to_database(database_path, 'nodes', df=point_df)
-        gm.mask_nodes(database_path, 'nodes', 'masked_nodes')
-        gm.add_elevation(database_path, 'masked_nodes', 'nodes_elevation')
-        end_section_1 = time.time()
-        time_section_1 = end_section_1 - start_section_1
-        print('reading process complete.')
-        print(f"Time taken for section 1: {time_section_1:.2f} seconds\n")
-    # # _____________________________
+                gm.write_to_database(database_path, 'nodes', df=point_df)
+            
+        # gm.mask_nodes(database_path, 'nodes', 'masked_nodes')
+        # gm.add_elevation(database_path, 'masked_nodes', 'nodes_elevation')
+        # end_section_1 = time.time()
+        # time_section_1 = end_section_1 - start_section_1
+        # print('reading process complete.')
+        # print(f"Time taken for section 1: {time_section_1:.2f} seconds\n")
+    # # # _____________________________
 
-    if preprocess:
-        print('Calculating barycentric ...')
-        mb.filter_valid_elements(data_database_path=database_path)
-        bc.compute_3d_barycentric(database_path=database_path, node_table_name='masked_nodes',
-                                    element_table_name='null_filtered_masked_elements')
-        # Output triangle_weights
-        print('Completed barycentric. \n')
-        print('Completed preprocessing. \n')
+    # if preprocess:
+    #     print('Calculating barycentric ...')
+    #     mb.filter_valid_elements(data_database_path=database_path)
+    #     bc.compute_3d_barycentric(database_path=database_path, node_table_name='masked_nodes',
+    #                                 element_table_name='null_filtered_masked_elements')
+    #     # Output triangle_weights
+    #     print('Completed barycentric. \n')
+    #     print('Completed preprocessing. \n')
 
-    if execute:
-        print('Barycentric interpolation...')
-        start_section_2 = time.time()
-        be.estimate(database_path)                
-        end_section_2 = time.time()
-        time_section_2 = end_section_2 - start_section_2
-        # output triangle_barycentric
-        print('Completed barycentric interpolation.')
-        print(f"Time taken for section 2: {time_section_2:.2f} seconds \n")
+    # if execute:
+    #     print('Barycentric interpolation...')
+    #     start_section_2 = time.time()
+    #     be.estimate(database_path)                
+    #     end_section_2 = time.time()
+    #     time_section_2 = end_section_2 - start_section_2
+    #     # output triangle_barycentric
+    #     print('Completed barycentric interpolation.')
+    #     print(f"Time taken for section 2: {time_section_2:.2f} seconds \n")
 
-        print('Zonal Interpolation...')
-        start_section_3 = time.time()
-        bi.interpolate(database_path=database_path)
-        end_section_3 = time.time()
-        time_section_3 = end_section_3 - start_section_3
-        print('Completed zonal interpolation.')
-        print(f"Time taken for section 3: {time_section_3:.2f} seconds \n")
+    #     print('Zonal Interpolation...')
+    #     start_section_3 = time.time()
+    #     bi.interpolate(database_path=database_path)
+    #     end_section_3 = time.time()
+    #     time_section_3 = end_section_3 - start_section_3
+    #     print('Completed zonal interpolation.')
+    #     print(f"Time taken for section 3: {time_section_3:.2f} seconds \n")
        
-        print('\nWriting rasters...')
-        start_section_4 = time.time()
-        bi.make_wse_depth_rasters(database_path=database_path,
-                                    generate_depth=generate_depth, output_depth_path=depth_path, 
-                                    output_wse_path=wse_path, generate_wse=generate_wse, zarr_format=zarr_format)
-        end_section_4 = time.time()
-        time_section_4 = end_section_4 - start_section_4
-        print('Completed writing rasters.')
-        print(f"Time taken for section 4: {time_section_4:.2f} seconds\n")
+    #     print('\nWriting rasters...')
+    #     start_section_4 = time.time()
+    #     bi.make_wse_depth_rasters(database_path=database_path,
+    #                                 generate_depth=generate_depth, output_depth_path=depth_path, 
+    #                                 output_wse_path=wse_path, generate_wse=generate_wse, zarr_format=zarr_format)
+    #     end_section_4 = time.time()
+    #     time_section_4 = end_section_4 - start_section_4
+    #     print('Completed writing rasters.')
+    #     print(f"Time taken for section 4: {time_section_4:.2f} seconds\n")
 
-        total_time = time_section_1 + time_section_2 + time_section_3 + time_section_4
-        total_hours = int(total_time // 3600)
-        total_minutes = int((total_time % 3600) // 60)
-        total_seconds = total_time % 60
+    #     total_time = time_section_1 + time_section_2 + time_section_3 + time_section_4
+    #     total_hours = int(total_time // 3600)
+    #     total_minutes = int((total_time % 3600) // 60)
+    #     total_seconds = total_time % 60
 
-        # Print total time in hours, minutes, and seconds
-        print(f"Total time taken: {total_hours} hours, {total_minutes} minutes, {total_seconds:.2f} seconds")
-        print('Script end.')
+    #     # Print total time in hours, minutes, and seconds
+    #     print(f"Total time taken: {total_hours} hours, {total_minutes} minutes, {total_seconds:.2f} seconds")
+    #     print('Script end.')
 
