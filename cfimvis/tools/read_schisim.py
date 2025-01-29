@@ -243,6 +243,16 @@ def index_triangles(triangles_path: str) -> None:
     return
 
 def mask_elements(database_path: str) -> None:
+    """
+    Filters elements based on the 'masked_coverage_fraction' table and creates a new table.
+
+    Args:
+        database_path (str): Path to the DuckDB database file.
+
+    Output:
+        - A new or updated 'masked_elements' table containing only elements whose 'pg_id' 
+          exists in the 'masked_coverage_fraction' table.
+    """
     data_conn = ibis.duckdb.connect(database_path)
     data_conn.raw_sql('LOAD spatial')
     data_conn.raw_sql(
