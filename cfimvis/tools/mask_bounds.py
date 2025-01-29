@@ -196,6 +196,18 @@ def filter_valid_elements(data_database_path: str) -> None:
     return
 
 def mask_raster(mask_database_path: str, raster_path: str) -> None:
+    """
+    Applies a spatial mask to a raster (DEM) based on geometries from a database table.
+
+    Args:
+        mask_database_path (str): Path to the DuckDB database containing the mask geometries.
+        raster_path (str): Path to the raster (DEM) file to be masked.
+
+    Output:
+        - A new masked raster file ('DEM_masked_4326.tif') saved to the 'data' directory. 
+          The raster is masked using geometries from the 'step_5' table in the DuckDB database 
+          and reprojected to the raster’s coordinate reference system (CRS) if necessary.
+    """
     # Load mask
     mask_conn = ibis.duckdb.connect(mask_database_path)
     try:
@@ -228,6 +240,16 @@ def mask_raster(mask_database_path: str, raster_path: str) -> None:
     return
 
 def filter_nodes(database_path: str) -> None:
+    """
+    Filters nodes based on valid node IDs and updates the 'nodes' table.
+
+    Args:
+        database_path (str): Path to the DuckDB database file.
+
+    Output:
+        - A new or updated 'nodes' table containing only the nodes whose 'node_id' 
+          is found in the 'valid_nodes_elevations' table.
+    """
     data_conn = ibis.duckdb.connect(database_path)
     try:
         data_conn.raw_sql('LOAD spatial')
