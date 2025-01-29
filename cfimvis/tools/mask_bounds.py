@@ -9,7 +9,7 @@ from rasterio.mask import mask
 
 ibis.options.interactive = True
 
-def create_general_mask(database_path: str, triangles_path: str,
+def create_general_mask(database_path: str,
                         schisim_table_name: str, state_table_name: str,
                         levee_table_name: str, nwm_table_name: str,
                         water_table_name: str, dissolve: bool) -> None:
@@ -22,8 +22,6 @@ def create_general_mask(database_path: str, triangles_path: str,
     -----------
     database_path : str
         Path to the DuckDB database file.
-    triangles_path : str
-        Path to the file containing the triangles dataset.
     schisim_table_name : str
         Name of the SCHISM table in the DuckDB database.
     state_table_name : str
@@ -140,6 +138,17 @@ def create_general_mask(database_path: str, triangles_path: str,
     return
 
 def mask_triangles(database_path: str, triangles_path: str) -> None:
+    """
+    Filters triangles based on the 'masked_coverage_fraction' table and updates the triangles table.
+
+    Args:
+        database_path (str): Path to the DuckDB database file.
+        triangles_path (str): Path to the file containing triangle data to be filtered.
+
+    Output:
+        - A new or updated 'triangles' table containing only triangles whose 'pg_id' exists 
+          in the 'masked_coverage_fraction' table.
+    """
     data_conn = ibis.duckdb.connect(database_path)
     data_conn.raw_sql(
         f"""
@@ -149,44 +158,28 @@ def mask_triangles(database_path: str, triangles_path: str) -> None:
         WHERE t.pg_id IN (SELECT pg_id FROM masked_coverage_fraction)
         """
     )
-    # Mask triangles that are fully overlap with costal mask
-    # data_conn.raw_sql(
-    #     """
-    #     CREATE OR REPLACE TABLE triangles_masked AS
-    #     SELECT 
-    #         t.* -- Keep pg_id from the table
-    #     FROM 
-    #         triangles AS t, step_5 AS s
-    #     WHERE 
-    #         ST_Intersects(t.geometry, s.geometry) -- Keep triangles that intersect
-    #         AND NOT ST_Within(t.geometry, s.geometry) -- Exclude those completely within step_5
-    #         OR NOT ST_Intersects(t.geometry, s.geometry); -- Keep triangles that do not intersect at all
-    #     """
-    # )
-    # Cleanup
     data_conn.con.close()
     return
 
 def filter_valid_elements(data_database_path: str) -> None:
+    """
+    Filters elements based on valid node IDs and creates a new table with valid elements.
 
+    Args:
+        data_database_path (str): Path to the DuckDB database file.
+
+    Output:
+        - A new or updated table 'null_filtered_masked_elements' containing elements from 
+          'masked_elements' where 'node_id_1', 'node_id_2', and 'node_id_3' are found in 
+          the 'masked_nodes' table.
+    """
     data_conn = ibis.duckdb.connect(data_database_path)
     try:
         data_conn.raw_sql('LOAD spatial')
     except: 
         data_conn.raw_sql('INSTALL spatial')
         data_conn.raw_sql('LOAD spatial')
-    # data_conn.raw_sql(f"ATTACH '{mask_database_path}' AS mask_db;")
-
-    # Create A new table for masked elements
-    # data_conn.raw_sql(
-    #     """ 
-    #     CREATE OR REPLACE TABLE masked_elements AS 
-    #     SELECT el.* 
-    #     FROM elements AS el
-    #     INNER JOIN mask_db.triangles_masked as m
-    #     ON el.pg_id = m.pg_id;
-    #     """
-    # )
+  
     # Also filter for null values in elevation (points outside domain)
     data_conn.raw_sql(
         """ 
@@ -199,22 +192,6 @@ def filter_valid_elements(data_database_path: str) -> None:
         """
     )
 
-    # Filter to all valid nodes (nodes with elevation and associated with masked elements)
-    # data_conn.raw_sql(
-    #     """
-    #     CREATE OR REPLACE TABLE valid_nodes_elevations AS
-    #     SELECT *
-    #     FROM nodes_elevation AS ne
-    #     WHERE elevation IS NOT NULL
-    #     AND node_id IN (
-    #         SELECT node_id_1 FROM null_filtered_masked_elements
-    #         UNION
-    #         SELECT node_id_2 FROM null_filtered_masked_elements
-    #         UNION
-    #         SELECT node_id_3 FROM null_filtered_masked_elements
-    #     );
-    #     """
-    # )
     data_conn.con.close()
     return
 
