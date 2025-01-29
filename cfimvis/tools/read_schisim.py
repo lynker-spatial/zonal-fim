@@ -195,7 +195,13 @@ def read_netcdf(file_path :str) -> pd.DataFrame:
     
 def crosswalk_nodes(database_path: str) -> None:
     """
-    Perform cross walk between nc and gr3 file using node cross walk tables.
+    Matches nodes between nc and gr3 files using crosswalk tables and stores the result in 'nodes'.
+
+    Args:
+        database_path (str): Path to the DuckDB database file.
+
+    Output:
+        - A new or updated 'nodes' table 
     """
     data_conn = ibis.duckdb.connect(database_path)
     data_conn.raw_sql(
@@ -221,6 +227,15 @@ def crosswalk_nodes(database_path: str) -> None:
     return
     
 def index_triangles(triangles_path: str) -> None:
+    """
+    Adds a unique index to triangles by modifying the 'FID' column.
+
+    Args:
+        triangles_path (str): Path to the Parquet file containing triangle geometries.
+
+    Output:
+        - Updates the input Parquet file by renaming 'FID' to 'pg_id' and incrementing its values by 1.
+    """
     triangle_shapes = gpd.read_parquet(triangles_path)
     triangle_shapes.rename(columns={'FID': 'pg_id'}, inplace=True)
     triangle_shapes['pg_id'] += 1
