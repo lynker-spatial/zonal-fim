@@ -12,6 +12,7 @@ A Python package for implementing barycentric interpolation using DuckDB, specif
 
 - [Features](#features)
 - [Installation](#installation)
+- [Data](#data)
 - [Usage](#usage)
 - [Preprocessing Workflow](#preprocessing-workflow)
 - [Testing](#testing)
@@ -69,9 +70,15 @@ To activate pre-configured environment execute
 conda activate coastal_fim_vis
 ```
 
-
 ---
 
+## Data
+Preprocessed sample data for Atlantic Gulf domain is:
+```url
+...
+```
+
+---
 
 ## Usage
    The script zonal_fim.py performs execution of pipeline for generating barycentric interpolation, generating masks, and preprocessing pipeline 
@@ -89,7 +96,7 @@ conda activate coastal_fim_vis
     if `--generate_wse False` there is no need to specify a path got `-q`
 
     ```shell
-    python zonal_fim.py --generate_mask False --preprocess False --generate_wse True --generate_depth True --zarr_format False  --execute True  --dissolve False -i '/path/agGridfile.gr3' -c '/path/zonal_database.duckdb' -m '/path/depth_raser_v1.tif' -q '/path/wse_raser_v1.tif'
+    python zonal_fim.py --generate_mask False --preprocess False --generate_wse True --generate_depth True --zarr_format False  --execute True  --dissolve False -i '/path/nwm.nc' -c '/path/zonal_database.duckdb' -m '/path/depth_raser_v1.tif' -q '/path/wse_raser_v1.tif'
     ```
     A sample output of depth raster:
 
