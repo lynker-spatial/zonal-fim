@@ -160,11 +160,10 @@ def reproject_dem(dem_path:str, output_dem_path:str) -> None:
 def setup_crosswalk_table(database_path: str, node_id_path: str) -> None:
     data_conn = ibis.duckdb.connect(database_path)
     
-    cross_walk = pd.read_csv(node_id_path)
-    cross_walk.rename(columns={'1': 'node_id_gr3'}, inplace=True)
+    cross_walk = pd.read_csv(node_id_path, header=None, names=['node_id_gr3'])
     cross_walk.reset_index(inplace=True)
     cross_walk.rename(columns={'index': 'node_id_nc'}, inplace=True)
-
+    cross_walk['node_id_nc'] += 1
     temp_file = None
 
     directory = 'temp'
