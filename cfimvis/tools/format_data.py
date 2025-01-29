@@ -18,11 +18,12 @@ import os
 
 def convert_elements_file(zip_file_path: str, output_folder_path: str, save_parqeut: bool=True) -> None:
     """
-    Unzips a shapefile zip file and saves the contents to the output folder.
+    Unzips a shapefile zip file, processes its contents, and saves the data as a GeoPackage and optionally as a Parquet file.
 
     Args:
         zip_file_path (str): The file path to the zip file containing the shapefile.
         output_folder_path (str): The folder path where the shapefile contents will be saved.
+        save_parqeut (bool): Flag to determine whether to save the data as a Parquet file (default is True).
 
     Functionality:
         - Extracts the contents of the zip file to the specified output folder.
@@ -81,6 +82,17 @@ def exctract_mask(mask_database_path: str, output_folder_path: str) -> None:
     return
 
 def store_metadata(dem_path: str, database_path: str, table_name: str) -> None:
+    """
+    Extracts metadata from a DEM (Digital Elevation Model) file and stores it in a specified DuckDB table.
+
+    Args:
+        dem_path (str): Path to the DEM file (usually a raster file such as GeoTIFF).
+        database_path (str): Path to the DuckDB database where metadata will be stored.
+        table_name (str): The name of the table where the metadata will be stored.
+
+    Returns:
+        None
+    """
     data_conn = ibis.duckdb.connect(database_path)
     with rasterio.open(dem_path) as src:
         raster_meta = src.meta
@@ -119,6 +131,16 @@ def store_metadata(dem_path: str, database_path: str, table_name: str) -> None:
     return
 
 def reproject_dem(dem_path:str, output_dem_path:str) -> None:
+    """
+    Reprojects a DEM (Digital Elevation Model) raster file to the target CRS (EPSG:4326).
+
+    Args:
+        dem_path (str): Path to the input DEM file (typically in a raster format like GeoTIFF).
+        output_dem_path (str): Path where the reprojected DEM file will be saved.
+
+    Returns:
+        None
+    """
     # Define the target CRS
     target_crs = "EPSG:4326"
     with rasterio.open(dem_path) as src:
@@ -158,6 +180,16 @@ def reproject_dem(dem_path:str, output_dem_path:str) -> None:
     return
 
 def setup_crosswalk_table(database_path: str, node_id_path: str) -> None:
+    """
+    Sets up a crosswalk table in the database by processing a CSV file with node IDs and storing it as a DuckDB table.
+
+    Args:
+        database_path (str): The file path to the DuckDB database where the crosswalk table will be created.
+        node_id_path (str): The file path to the CSV file containing node IDs to be used for the crosswalk.
+
+    Returns:
+        None
+    """
     data_conn = ibis.duckdb.connect(database_path)
     
     cross_walk = pd.read_csv(node_id_path, header=None, names=['node_id_gr3'])
