@@ -6,6 +6,16 @@ from ibis import _
 import rasterio
 
 def read_zonal_outputs(database_path: str, zonal_output_path: str) -> None:
+    """
+    Reads zonal output data from a specified file and loads it into a DuckDB database.
+
+    Args:
+        database_path (str): Path to the DuckDB database file.
+        zonal_output_path (str): Path to the zonal output data source.
+
+    The function establishes a connection to the DuckDB database, loads the spatial extension,
+    and creates or replaces a table named 'z_w' with the contents of the zonal output file.
+    """
     data_conn = ibis.duckdb.connect(database_path)
     data_conn.raw_sql('LOAD spatial')
     data_conn.raw_sql(
@@ -18,6 +28,17 @@ def read_zonal_outputs(database_path: str, zonal_output_path: str) -> None:
     return
 
 def filter_masked(database_path: str) -> None:
+    """
+    Filters and creates a new table 'masked_coverage_fraction' in a DuckDB database.
+
+    Args:
+        database_path (str): Path to the DuckDB database file.
+
+    The function connects to the DuckDB database, loads the spatial extension, 
+    and creates or replaces the 'masked_coverage_fraction' table by filtering 
+    the 'coverage_fraction' table. It removes rows where the 'mask' column is NaN 
+    and ensures that the 'elevation' column is not null or NaN. 
+    """
     data_conn = ibis.duckdb.connect(database_path)
     data_conn.raw_sql('LOAD spatial')
     data_conn.raw_sql(
