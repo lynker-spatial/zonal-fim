@@ -16,7 +16,21 @@ import numpy as np
 from tqdm import tqdm
 import os
 
-def add_point_geo(database_path: str, table_name: str, lat_col_nam: str, long_col_name: str):
+def add_point_geo(database_path: str, table_name: str, lat_col_nam: str, long_col_name: str) -> None:
+    """
+    Adds a 'geometry' column to a specified table and populates it with points 
+    created from latitude and longitude columns.
+
+    Args:
+        database_path (str): Path to the DuckDB database file.
+        table_name (str): Name of the table to update.
+        lat_col_nam (str): Name of the column containing latitude values.
+        long_col_name (str): Name of the column containing longitude values.
+
+    Output:
+        - Adds a new 'geometry' column to the specified table, 
+          populated with point geometries created from the latitude and longitude values.
+    """
     data_conn = ibis.duckdb.connect(database_path)
     data_conn.raw_sql('LOAD spatial')
     data_conn.raw_sql(
@@ -78,6 +92,19 @@ def write_to_database(database_path: str, table_name: str, df: pd.DataFrame([])=
 
 
 def get_none_overlapping(dem_path: str, database_path: str, point_gdf_table: str) -> None:
+    """
+    Identifies points from a GeoDataFrame that do not overlap with a raster (DEM) and stores the result in a database.
+
+    Args:
+        dem_path (str): Path to the raster DEM file.
+        database_path (str): Path to the DuckDB database file.
+        point_gdf_table (str): Name of the table in the database containing the points (GeoDataFrame).
+
+    Output:
+        - A new 'points_outside_dem' table in the database containing points from the GeoDataFrame 
+          that do not intersect with the DEM (raster).
+        - Metadata about the CRS of the involved datasets stored in a 'metadata' table.
+    """
     data_conn = ibis.duckdb.connect(database_path)
     data_conn.raw_sql('LOAD spatial')
 
@@ -155,7 +182,18 @@ def get_none_overlapping(dem_path: str, database_path: str, point_gdf_table: str
     return 
 
 def extract_elevation(dem_path: str, database_path: str) -> gpd.GeoDataFrame([]):
+    """
+    Extracts elevation data from a raster DEM for points stored in a 'nodes' table and stores the results in a new table.
 
+    Args:
+        dem_path (str): Path to the DEM file (in Cloud Optimized GeoTIFF format).
+        database_path (str): Path to the DuckDB database file.
+
+    Output:
+        - A new 'nodes_elevation' table in the database, containing the 'node_id', 'long', 'lat', 
+          and 'elevation' values for each node, with elevation data extracted from the raster DEM.
+        - The CRS of the points is checked and transformed to match the raster CRS if necessary.
+    """
     data_conn = ibis.duckdb.connect(database_path)
     try:
         data_conn.raw_sql('LOAD spatial')
@@ -210,6 +248,18 @@ def extract_elevation(dem_path: str, database_path: str) -> gpd.GeoDataFrame([])
     return 
 
 def mask_nodes(database_path: str, table_name:str, masked_table_name:str) -> None:
+    """
+    Creates a new table with nodes masked based on their inclusion in the 'masked_elements' table.
+
+    Args:
+        database_path (str): Path to the DuckDB database file.
+        table_name (str): Name of the table containing the nodes to be masked.
+        masked_table_name (str): Name of the new table where the masked nodes will be stored.
+
+    Output:
+        - A new table (specified by 'masked_table_name') in the database containing only the nodes 
+          whose 'node_id' matches any 'node_id_1', 'node_id_2', or 'node_id_3' in the 'masked_elements' table.
+    """
     data_conn = ibis.duckdb.connect(database_path)
     data_conn.raw_sql('LOAD spatial')
     data_conn.raw_sql(
@@ -229,6 +279,19 @@ def mask_nodes(database_path: str, table_name:str, masked_table_name:str) -> Non
     return
 
 def add_elevation(database_path: str, table_name:str, elevation_table:str) -> None:
+    """
+    Adds elevation data from an elevation table to a node table based on matching node IDs.
+
+    Args:
+        database_path (str): Path to the DuckDB database file.
+        table_name (str): Name of the table containing the nodes to which elevation data will be added.
+        elevation_table (str): Name of the table containing elevation data.
+
+    Output:
+        - Updates the table specified by 'table_name' by adding the 'elevation' column 
+          from the 'elevation_table' for each matching 'node_id'. 
+        - Only nodes with non-null elevation values are retained in the resulting table.
+    """
     data_conn = ibis.duckdb.connect(database_path)
     data_conn.raw_sql('LOAD spatial')
     data_conn.raw_sql(
