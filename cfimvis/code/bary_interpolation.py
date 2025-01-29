@@ -112,39 +112,43 @@ def make_wse_depth_rasters(database_path: str, generate_wse: bool=False, generat
                             output_wse_path: str =  "data/output_wse_barycentric_interpolation.tif", 
                              zarr_format: bool = True) -> None:
     """
-    The `make_depth_raster` function calculates a depth raster by computing the difference between 
-    a water surface elevation (WSE) raster and a digital elevation model (DEM) raster. The result 
-    is saved as a new GeoTIFF file.
+    The `make_wse_depth_rasters` function generates depth and/or water surface elevation (WSE) rasters 
+    from a spatial database and saves them in GeoTIFF or Zarr format.
 
     Input:
-        - dem_path (str): 
-            File path to the DEM raster file. This file represents the elevation of the terrain.
-
-        - wse_path (str, optional): 
-            File path to the WSE raster file. The default value is 
-            "data/wse_barycentric_interpolation.tif". This raster represents water surface elevation.
-
+        - database_path (str): 
+            File path to the spatial database containing DEM, WSE, and depth data.
+        
+        - generate_wse (bool, optional):
+            Whether to generate a WSE raster. Default is False.
+        
+        - generate_depth (bool, optional):
+            Whether to generate a depth raster. Default is True.
+        
+        - output_depth_path (str, optional):
+            File path for the output depth raster. Default is 'data/output_depth.tif'.
+        
+        - output_wse_path (str, optional):
+            File path for the output WSE raster. Default is 'data/output_wse_barycentric_interpolation.tif'.
+        
+        - zarr_format (bool, optional):
+            Whether to save the output in Zarr format instead of GeoTIFF. Default is True.
+    
     Output:
-        - None: 
-            Generates a GeoTIFF raster file (`depth_barycentric_interpolation.tif`) in the `data/` 
-            directory, representing the depth values.
+        - None:
+            Generates one or both of the specified raster files, storing depth or WSE values.
 
     Example:
-        1. Ensure the following input files are available:
-           - A DEM raster file, e.g., `data/DEM_masked_4326.tif`.
-           - A WSE raster file, e.g., `data/wse_barycentric_interpolation.tif`.
-
-        2. Call the function:
-            make_depth_raster("data/DEM_masked_4326.tif", "data/wse_barycentric_interpolation.tif")
-
-        3. Result:
-            A GeoTIFF file named `depth_barycentric_interpolation.tif` is created in the `data/` 
-            directory, containing the depth values.
-
+        Call the function:
+        make_wse_depth_rasters("data/spatial_database.duckdb", generate_depth=True, generate_wse=True)
+        
+        Result:
+        - A depth raster saved as 'data/output_depth.tif' or '.zarr'.
+        - A WSE raster saved as 'data/output_wse_barycentric_interpolation.tif' or '.zarr'.
+    
     Notes:
-        - Both input rasters must have the same Coordinate Reference System (CRS). 
-          If they differ, the function raises a `ValueError`.
-        - NoData values in either raster are preserved in the output raster as `NaN`.
+        - The function extracts raster metadata (CRS, height, width, etc.) from the database.
+        - Outputs are stored in either GeoTIFF (compressed) or Zarr format.
     """
     data_conn = ibis.duckdb.connect(database_path)
     # out_data_conn = ibis.duckdb.connect(output_database_path)
