@@ -131,22 +131,22 @@ if __name__ == '__main__':
                 point_df, _, _ = rs.read_gr3(file_path)
                 gm.write_to_database(database_path, 'nodes', df=point_df)
             
-        # gm.mask_nodes(database_path, 'nodes', 'masked_nodes')
-        # gm.add_elevation(database_path, 'masked_nodes', 'nodes_elevation')
-        # end_section_1 = time.time()
-        # time_section_1 = end_section_1 - start_section_1
-        # print('reading process complete.')
-        # print(f"Time taken for section 1: {time_section_1:.2f} seconds\n")
+        gm.mask_nodes(database_path, 'nodes', 'masked_nodes')
+        gm.add_elevation(database_path, 'masked_nodes', 'nodes_elevation')
+        end_section_1 = time.time()
+        time_section_1 = end_section_1 - start_section_1
+        print('reading process complete.')
+        print(f"Time taken for section 1: {time_section_1:.2f} seconds\n")
     # # # _____________________________
 
-    # if preprocess:
-    #     print('Calculating barycentric ...')
-    #     mb.filter_valid_elements(data_database_path=database_path)
-    #     bc.compute_3d_barycentric(database_path=database_path, node_table_name='masked_nodes',
-    #                                 element_table_name='null_filtered_masked_elements')
-    #     # Output triangle_weights
-    #     print('Completed barycentric. \n')
-    #     print('Completed preprocessing. \n')
+    if preprocess:
+        print('Calculating barycentric ...')
+        mb.filter_valid_elements(data_database_path=database_path)
+        bc.compute_3d_barycentric(database_path=database_path, node_table_name='masked_nodes',
+                                    element_table_name='null_filtered_masked_elements')
+        # Output triangle_weights
+        print('Completed barycentric. \n')
+        print('Completed preprocessing. \n')
 
     # if execute:
     #     print('Barycentric interpolation...')

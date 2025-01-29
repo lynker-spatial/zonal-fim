@@ -39,13 +39,14 @@ Several paths must be specified including:
 -k '/path/shape_file_folder' that is the folder path where the schisim element shape file lives <br>
 -l '/path/output_elements_folder' that is the folder path where the schisim element parquet and geopackage will be saved to <br>
 -a '/path/masks.duckdb' path to the mask database that will store the generated overall mask <br>
+-v '/path/atl_orig_id.csv' path to the crosswalk table between gr3 and netcdf node ids <br>
 
 and there is an optional item to dissolve all geometries into a single multi-polygon feature that can be set but recommend the default `True` value
 
 --dissolve
 
 ```shell
-python zonal_fim.py --generate_mask True --preprocess False --generate_wse False --generate_depth False --zarr_format False  --execute False  --dissolve True -k '/path/shape_file_folder' -l '/path/output_elements_folder' -a '/path/masks.duckdb' -p 'exterior_mask_schism_boundary_atlantic_buffer_atlgulf' -n 'exterior_mask_state_boundaries_conus_atlgulf' -x 'interior_mask_levee_protected_area_conus_atlgulf' -t 'interior_mask_nwm_lakes_conus_atlgulf' -f 'interior_mask_water_polygon_conus_atlgulf'
+python zonal_fim.py --generate_mask True --preprocess False --generate_wse False --generate_depth False --zarr_format False  --execute False  --dissolve True -k '/path/shape_file_folder' -l '/path/output_elements_folder' -a '/path/masks.duckdb' -v '/path/atl_orig_id.csv' -p 'exterior_mask_schism_boundary_atlantic_buffer_atlgulf' -n 'exterior_mask_state_boundaries_conus_atlgulf' -x 'interior_mask_levee_protected_area_conus_atlgulf' -t 'interior_mask_nwm_lakes_conus_atlgulf' -f 'interior_mask_water_polygon_conus_atlgulf' 
 ```
 
 
