@@ -131,8 +131,8 @@ if __name__ == '__main__':
                 point_df, _, _ = rs.read_gr3(file_path)
                 gm.write_to_database(database_path, 'nodes', df=point_df)
             
-        gm.mask_nodes(database_path, 'nodes', 'masked_nodes')
-        gm.add_elevation(database_path, 'masked_nodes', 'nodes_elevation')
+        gm.mask_nodes(database_path, 'nodes', 'nodes')
+        gm.add_elevation(database_path, 'nodes', 'nodes_elevation')
         end_section_1 = time.time()
         time_section_1 = end_section_1 - start_section_1
         print('reading process complete.')
@@ -141,8 +141,8 @@ if __name__ == '__main__':
 
     if preprocess:
         print('Calculating barycentric ...')
-        mb.filter_valid_elements(data_database_path=database_path)
-        bc.compute_3d_barycentric(database_path=database_path, node_table_name='masked_nodes',
+        mb.filter_valid_elements(data_database_path=database_path, table_name='nodes')
+        bc.compute_3d_barycentric(database_path=database_path, node_table_name='nodes',
                                     element_table_name='null_filtered_masked_elements')
         # Output triangle_weights
         print('Completed barycentric. \n')
@@ -151,7 +151,7 @@ if __name__ == '__main__':
     if execute:
         print('Barycentric interpolation...')
         start_section_2 = time.time()
-        be.estimate(database_path)                
+        be.estimate(database_path, table_name='nodes')                
         end_section_2 = time.time()
         time_section_2 = end_section_2 - start_section_2
         # output triangle_barycentric
