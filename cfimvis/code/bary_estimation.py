@@ -5,7 +5,7 @@ import ibis
 from ibis import _
 
 
-def estimate(database_path: str) -> None:
+def estimate(database_path: str, table_name: str) -> None:
     """
     The `estimate` function processes spatial data stored in a DuckDB database to compute 
     weighted centroids and water surface elevation (WSE) for triangular elements. It leverages 
@@ -18,6 +18,7 @@ def estimate(database_path: str) -> None:
             * nodes: Contains `node_id`, `long`, `lat`, and `wse` (water surface elevation).
             * elements: Contains `pg_id` (triangle ID) and the three nodes defining each triangle 
               with their barycentric weights (`node1_weight`, `node2_weight`, `node3_weight`).
+        - table_name (str): Name of the table containing the nodes to which elevation data will be added.
 
     Output:
         - None: The function modifies the database by creating or updating the table 
@@ -51,16 +52,7 @@ def estimate(database_path: str) -> None:
     # out_data_conn.raw_sql(f"ATTACH '{database_path}' AS compute_db;")
     # Compute WSE based on barycentric weights for all elements
     data_conn.raw_sql(
-        """
-        -- Map node indices to their coordinates and elevation (wse)
-        CREATE OR REPLACE TEMP TABLE nodes_data AS 
-        SELECT 
-            node_id,
-            long,
-            lat,
-            wse
-        FROM masked_nodes;
-
+        f"""
         -- Join triangle table with node data to get vertex coordinates
         CREATE OR REPLACE TEMP TABLE triangle_vertices AS 
         SELECT 
@@ -71,9 +63,9 @@ def estimate(database_path: str) -> None:
             n2.long AS node2_long, n2.lat AS node2_lat, n2.wse AS node2_wse,
             n3.long AS node3_long, n3.lat AS node3_lat, n3.wse AS node3_wse
         FROM triangle_weights t
-        JOIN nodes_data n1 ON t.node_id_1 = n1.node_id 
-        JOIN nodes_data n2 ON t.node_id_2 = n2.node_id 
-        JOIN nodes_data n3 ON t.node_id_3 = n3.node_id; 
+        JOIN '{table_name}' n1 ON t.node_id_1 = n1.node_id 
+        JOIN '{table_name}' n2 ON t.node_id_2 = n2.node_id 
+        JOIN '{table_name}' n3 ON t.node_id_3 = n3.node_id; 
 
         -- Compute weighted centroids
         CREATE OR REPLACE TEMP TABLE weighted_centroids AS 

@@ -161,12 +161,13 @@ def mask_triangles(database_path: str, triangles_path: str) -> None:
     data_conn.con.close()
     return
 
-def filter_valid_elements(data_database_path: str) -> None:
+def filter_valid_elements(data_database_path: str, table_name:str) -> None:
     """
     Filters elements based on valid node IDs and creates a new table with valid elements.
 
     Args:
         data_database_path (str): Path to the DuckDB database file.
+        table_name (str): Name of the table containing the nodes to which elevation data will be added.
 
     Output:
         - A new or updated table 'null_filtered_masked_elements' containing elements from 
@@ -182,13 +183,13 @@ def filter_valid_elements(data_database_path: str) -> None:
   
     # Also filter for null values in elevation (points outside domain)
     data_conn.raw_sql(
-        """ 
+        f""" 
         CREATE OR REPLACE TABLE null_filtered_masked_elements AS
         SELECT *
         FROM masked_elements AS me
-        WHERE node_id_1 IN (SELECT node_id FROM masked_nodes) 
-            AND node_id_2 IN (SELECT node_id FROM masked_nodes) 
-            AND node_id_3 IN (SELECT node_id FROM masked_nodes);
+        WHERE node_id_1 IN (SELECT node_id FROM '{table_name}') 
+            AND node_id_2 IN (SELECT node_id FROM '{table_name}') 
+            AND node_id_3 IN (SELECT node_id FROM '{table_name}');
         """
     )
 

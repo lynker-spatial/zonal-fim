@@ -174,11 +174,10 @@ def read_netcdf(file_path :str) -> pd.DataFrame:
             return pd.DataFrame()
 
         # Select the variables from the Dataset
-        ds_selected = ds[valid_variables]
-        df = ds_selected.to_dataframe()
+        ds_selected = ds[valid_variables].load()
+        df = ds_selected.to_dataframe().reset_index()
 
         # Create the node-index and rename appropriately
-        df = df.reset_index()
         df.rename(columns={'nSCHISM_hgrid_node': 'node_id', 'SCHISM_hgrid_node_x': 'long', 
                            'SCHISM_hgrid_node_y': 'lat', 'elevation': 'wse'}, inplace=True)
         df.pop('time')
