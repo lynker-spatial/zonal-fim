@@ -73,9 +73,9 @@ conda activate coastal_fim_vis
 ---
 
 ## Data
-Preprocessed sample data for Atlantic Gulf domain is:
+Preprocessed data for Atlantic Gulf domain is:
 ```url
-...
+https://lynker-spatial.s3.us-west-2.amazonaws.com/tabular-resources/zonal_database.duckdb
 ```
 
 ---
