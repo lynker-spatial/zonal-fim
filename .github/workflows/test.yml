@@ -13,7 +13,7 @@ jobs:
       uses: conda-incubator/setup-miniconda@v2
       with:
         auto-update-conda: true
-        environment-file: environment.yaml
+        environment-file: environment.yml
         activate-environment: coastal_fim_vis
 
     - name: Run tests
