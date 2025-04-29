@@ -121,4 +121,5 @@ dependencies:
       - xyzservices==2024.9.0
       - yarl==1.17.0
       - zarr==2.18.3
+      - pytest==8.3.5
 
