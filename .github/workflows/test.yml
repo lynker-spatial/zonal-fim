@@ -17,5 +17,7 @@ jobs:
         activate-environment: coastal_fim_vis
 
     - name: Run tests
-      run: pytest
+      run: |
+        export PYTHONPATH=$PYTHONPATH:.
+        pytest tests/
       shell: bash -l {0}

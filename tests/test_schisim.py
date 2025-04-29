@@ -2,7 +2,7 @@ import xarray as xr
 from datetime import datetime
 import pytest
 import os
-os.chdir("..")
+# os.chdir("..")
 import cfimvis.tools.read_schisim as rs
 
 def test_nc_file_rows():
@@ -23,3 +23,4 @@ def test_nc_file_rows():
     
     # Assert the first dimension has appropriate nodes
     assert point_df[variable_name].shape[0] == 10481055, f"Expected 10481055 nodes, got {point_df[variable_name].shape[0]}"
+    # print('\nPassed schisim integrity test for new data...\n')
