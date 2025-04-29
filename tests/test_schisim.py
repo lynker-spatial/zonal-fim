@@ -15,6 +15,9 @@ def test_nc_file_rows():
         point_df = rs.read_netcdf(url, is_url=True, verbose=False)
     except Exception as e:
         pytest.fail(f"Failed to open dataset: {e}")
+
+    if point_df is None:
+        pytest.fail("read_netcdf returned None, expected a dataset")
     
     # Check the wse variable
     variable_name = 'wse'  
