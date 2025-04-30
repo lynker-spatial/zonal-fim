@@ -1,4 +1,4 @@
-name: coastal_fim_vis22
+name: coastal_fim_vis
 channels:
   - conda-forge
 dependencies:
