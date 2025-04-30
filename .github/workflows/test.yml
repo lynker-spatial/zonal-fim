@@ -1,0 +1,23 @@
+name: Test
+
+on: [push]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Setup Miniconda
+      uses: conda-incubator/setup-miniconda@v2
+      with:
+        auto-update-conda: true
+        environment-file: environment.yml
+        activate-environment: coastal_fim_vis
+
+    - name: Run tests
+      run: |
+        export PYTHONPATH=$PYTHONPATH:.
+        pytest tests/
+      shell: bash -l {0}

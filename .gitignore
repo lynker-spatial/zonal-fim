@@ -38,6 +38,8 @@ failed_downloads.txt
 *.gpkg
 *.db
 *.tif
+tests/test_database.py
+tests/tests.ipynb
 
 # Folders
 .vscode/settings.json
@@ -45,7 +47,6 @@ data/*
 DEM/*
 saved_batches*/*
 constant_n/model/*
-test*/
 data/*
 [0-9]*/
 trash/*

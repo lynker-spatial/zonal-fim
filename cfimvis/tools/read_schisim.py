@@ -8,6 +8,8 @@ import xarray as xr
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Tuple
+import requests
+from io import BytesIO
 
 # ----------------- Read 2dm file
 def read_2dm(file_path: str) -> Tuple[List[List[float]], List[List[int]], pd.DataFrame, pd.DataFrame]:
@@ -138,7 +140,7 @@ def read_gr3(file_path: str) -> Tuple[pd.DataFrame, pd.DataFrame, List[List[str]
 
     return nodes_df, elements_df, extra_lines
 
-def read_netcdf(file_path :str) -> pd.DataFrame: 
+def read_netcdf(file_path :str, is_url: bool=False, verbose: bool=False) -> pd.DataFrame: 
     """
     Reads a .nc file using xarray and converts it to a pandas DataFrame.
 
@@ -150,17 +152,32 @@ def read_netcdf(file_path :str) -> pd.DataFrame:
                            Returns None if there are issues reading the file.
     """
     try:
-        ds = xr.open_dataset(file_path)
-        # Print dataset info for exploration
-        print(f"model TITLE: {ds.TITLE}") 
-        print(f"Conventions: {ds.Conventions}") 
-        print(f"code version: {ds.code_version}") 
-        print(f"NWM version numbere: {ds.NWM_version_number}") 
-        print(f"model output type: {ds.model_output_type}") 
-        print(f"model configuration: {ds.model_configuration}") 
-        print(f"model total valid times: {ds.model_total_valid_times}") 
-        print(f"model nitialization time: {ds.model_initialization_time}") 
-        print(f"model output_valid time: {ds.model_output_valid_time}") 
+        if is_url:
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'
+            }
+            # Fetch
+            response = requests.get(file_path, headers=headers)
+            # Check if the request was successful
+            if response.status_code != 200:
+                print(f"Failed to fetch data: {response.status_code} - {response.text}")
+                exit()
+            # Load the dataset
+            ds = xr.open_dataset(BytesIO(response.content))
+        else:
+            ds = xr.open_dataset(file_path)
+
+        if verbose:
+            # Print dataset info for exploration
+            print(f"model TITLE: {ds.TITLE}") 
+            print(f"Conventions: {ds.Conventions}") 
+            print(f"code version: {ds.code_version}") 
+            print(f"NWM version numbere: {ds.NWM_version_number}") 
+            print(f"model output type: {ds.model_output_type}") 
+            print(f"model configuration: {ds.model_configuration}") 
+            print(f"model total valid times: {ds.model_total_valid_times}") 
+            print(f"model nitialization time: {ds.model_initialization_time}") 
+            print(f"model output_valid time: {ds.model_output_valid_time}") 
         selected_variables = ['SCHISM_hgrid_node_x', 'SCHISM_hgrid_node_y', 'elevation'] 
 
         # Drop variables that aren't in the dataset, warning the user.
