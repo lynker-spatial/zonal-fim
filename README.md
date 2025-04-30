@@ -1,5 +1,10 @@
-# Coastal-FIM
+# Coastal-FIM:<a href="https://github.com/owp-spatial/zonal-fim.git"><img src="assets/images/zonal_dim_logo.png" align="right" width="35%"/></a>
 
+<!-- badges: start -->
+[![Test Workflow Status](https://github.com/owp-spatial/zonal-fim/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/owp-spatial/zonal-fim/actions/workflows/test.yml)
+[![DuckDB](https://img.shields.io/badge/-DuckDB-blue?logo=duckdb)](https://duckdb.org/)
+[![Ibis](https://img.shields.io/badge/-Ibis-blue?logo=ibis)](https://ibis-project.org/)
+<!-- badges: end -->
 
 A Python package for implementing barycentric interpolation using DuckDB, specifically designed to compute SCHISM-derived depths on 30m grids. This tool provides an efficient, scalable solution for geospatial computations in large coastal domains.
 
