@@ -284,7 +284,7 @@ def mask_nodes(database_path: str, table_name:str, masked_table_name:str) -> Non
     data_conn.con.close()
     return
 
-def add_elevation(database_path: str, table_name:str, elevation_table:str) -> None:
+def add_elevation(database_path:str, table_name:str, elevation_table:str, elevation_threshold:float = None) -> None:
     """
     Adds elevation data from an elevation table to a node table based on matching node IDs.
 
@@ -300,6 +300,12 @@ def add_elevation(database_path: str, table_name:str, elevation_table:str) -> No
     """
     data_conn = ibis.duckdb.connect(database_path)
     data_conn.raw_sql('LOAD spatial')
+    # If the threshold is provided, apply it to mask nodes
+    elevation_filter_sql = ""
+    if elevation_threshold is not None:
+        print(f"Applying elevation threshold: filtering for elevation >= {elevation_threshold}")
+        elevation_filter_sql = f"AND e.elevation >= {elevation_threshold}"
+        
     data_conn.raw_sql(
         f"""
         CREATE OR REPLACE TABLE '{table_name}' AS
@@ -307,7 +313,8 @@ def add_elevation(database_path: str, table_name:str, elevation_table:str) -> No
         FROM '{table_name}' AS n
         LEFT JOIN '{elevation_table}' AS e
         ON n.node_id = e.node_id
-        WHERE e.elevation IS NOT NULL;
+        WHERE e.elevation IS NOT NULL
+            {elevation_filter_sql}; 
         """
     )
     data_conn.con.close()

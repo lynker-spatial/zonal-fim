@@ -11,6 +11,7 @@ import cfimvis.tools.format_data as fd
 import cfimvis.tools.zonal_operations as zo
 import cfimvis.code.bary_estimation as be
 import cfimvis.code.bary_interpolation as bi
+import tests.validation_checks as vc
 
 def str_to_bool(value):
     if isinstance(value, bool):
@@ -29,6 +30,8 @@ if __name__ == '__main__':
     parser.add_argument('-e','--generate_wse',help='activates the generate_wse to produce a map of WSE', required=False, type=str_to_bool, default=False)
     parser.add_argument('-g','--generate_depth',help='activates the generate_depth to produce a map of Depth', required=False, type=str_to_bool, default=True)
     parser.add_argument('-b','--zarr_format',help='activates the zarr_format that replaces geotif writing with zarr', required=False, type=str_to_bool, default=True)
+    parser.add_argument('-dt','--depth_threshold',help='activates the depth_threshold that masks depth raster with a given depth threshold', required=False, type=float, default=None)
+    parser.add_argument('-et','--elevation_threshold',help='activates the elevation_threshold that masks nodes with a given elevation threshold', required=False, type=float, default=None)
     parser.add_argument('-r','--execute',help='activates the execute that runs the pipeline for generating interpolated depth', required=False, type=str_to_bool, default=True)
     parser.add_argument('-o','--dem_path',help='dem_path', required=False, type=str, default='')
     parser.add_argument('-m','--depth_path',help='depth raster path to save the file to if zarr format is chosen it automatically converts tif extension to zarr  e.g., /data/raster_v1.tif', required=False, type=str, default='')
@@ -47,6 +50,7 @@ if __name__ == '__main__':
     parser.add_argument('-t','--nwm_table_name',help='Name of the National Water Model table in the DuckDB database.',required=False,type=str, default="interior_mask_nwm_lakes_conus_atlgulf")
     parser.add_argument('-f','--water_table_name',help='Name of the water bodies table in the DuckDB database.',required=False,type=str, default="interior_mask_water_polygon_conus_atlgulf")
     parser.add_argument('-s','--dissolve',help='Whether to dissolve overlapping geometries at each stage.',required=False, type=str_to_bool, default=True)
+    parser.add_argument('-vv','--verbose',help='verbose true to print',required=False,type=str_to_bool,default=True)
 
     args = vars(parser.parse_args())
     generate_mask = args['generate_mask']
@@ -54,6 +58,8 @@ if __name__ == '__main__':
     generate_wse = args['generate_wse']
     generate_depth = args['generate_depth']
     zarr_format = args['zarr_format']
+    depth_threshold = args['depth_threshold']
+    elevation_threshold = args['elevation_threshold']
     execute = args['execute']
     dem_path = args['dem_path']
     depth_path = args['depth_path']
@@ -72,6 +78,9 @@ if __name__ == '__main__':
     nwm_table_name = args['nwm_table_name']
     water_table_name = args['water_table_name']
     dissolve = args['dissolve']
+    verbose = args['verbose']
+    print(f"elevation_threshold: {elevation_threshold}")
+    vc.validate_paths(database_path, file_path)
     print('\n')
 
     if generate_mask:
@@ -97,7 +106,7 @@ if __name__ == '__main__':
         print('Added node crosswalk to duckdb.\n')
         print('Ingesting zonal output file ...')
         gm.write_to_database(database_path, 'coverage_fraction', df_path=zonal_path)
-        zo.filter_masked(database_path)
+        zo.filter_masked(database_path, elevation_threshold)
         print('Added zonal output file to duckdb.\n')
         # Ingest and filter triangles data
         print("Ingesting triangles data ...")
@@ -122,7 +131,7 @@ if __name__ == '__main__':
         if 'point_df' not in locals() and 'point_df' not in globals():
             if file_path.endswith('.nc'):
                 print('Reading .nc file...')
-                point_df = rs.read_netcdf(file_path)
+                point_df = rs.read_netcdf(file_path, verbose=verbose)
                 gm.write_to_database(database_path, 'nodes', df=point_df)
                 print('Crosswalking nodes...')
                 rs.crosswalk_nodes(database_path)
@@ -132,7 +141,7 @@ if __name__ == '__main__':
                 gm.write_to_database(database_path, 'nodes', df=point_df)
             
         gm.mask_nodes(database_path, 'nodes', 'nodes')
-        gm.add_elevation(database_path, 'nodes', 'nodes_elevation')
+        gm.add_elevation(database_path, 'nodes', 'nodes_elevation', elevation_threshold)
         end_section_1 = time.time()
         time_section_1 = end_section_1 - start_section_1
         print('reading process complete.')
@@ -170,7 +179,8 @@ if __name__ == '__main__':
         start_section_4 = time.time()
         bi.make_wse_depth_rasters(database_path=database_path,
                                     generate_depth=generate_depth, output_depth_path=depth_path, 
-                                    output_wse_path=wse_path, generate_wse=generate_wse, zarr_format=zarr_format)
+                                    output_wse_path=wse_path, generate_wse=generate_wse, 
+                                    zarr_format=zarr_format, depth_threshold=depth_threshold)
         end_section_4 = time.time()
         time_section_4 = end_section_4 - start_section_4
         print('Completed writing rasters.')
