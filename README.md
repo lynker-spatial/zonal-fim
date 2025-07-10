@@ -108,7 +108,21 @@ https://lynker-spatial.s3.us-west-2.amazonaws.com/tabular-resources/zonal_databa
     ![shell](assets/images/execution.png)
     ![output](assets/images/depth_output.png)
 
-2. **Output**:
+2. **Masking**: 
+   There are two ways to mask outputs of the zonal fim depth raster and both can be applied simultaneously or none at all:
+   - Mask nodes based on their elevation profile: one can provide a certain elevation threshold to mask nodes form zonal computation (this does increase computational efficiency due masking of the nodes them selfs). There is an optional `--elevation_threshold` or `-et` argument that can be passed. </br></br>
+   For example we can mask all node bellow sea level </br>
+   ```shell
+   python zonal_fim.py --generate_mask False --preprocess False --generate_wse True --generate_depth True --zarr_format False  --execute True  --dissolve False -et 0 -i '/path/nwm.nc' -c '/path/zonal_database.duckdb' -m '/path/depth_raser_v1.tif' -q '/path/wse_raser_v1.tif'
+   ```
+
+   - Mask generated depth raster: one can provide a certain depth threshold to mask certain depth values form zonal outputs. There is an optional `--depth_threshold` or `-dt` argument that can be passed. </br></br>
+   For example we can mask depth values bellow 0.5 feet or 0.1524 m </br>
+   ```shell
+   python zonal_fim.py --generate_mask False --preprocess False --generate_wse True --generate_depth True --zarr_format False  --execute True  --dissolve False -dt 0.1524 -i '/path/nwm.nc' -c '/path/zonal_database.duckdb' -m '/path/depth_raser_v1.tif' -q '/path/wse_raser_v1.tif'
+   ```
+
+3. **Output**:
    - Barycentric interpolation is saved as depth table in the DuckDB database.
    - Can write WSE interpolation and depth values as .tif and .zarr file if specified. 
 

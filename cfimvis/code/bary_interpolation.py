@@ -110,7 +110,7 @@ def interpolate(database_path: str) -> None:
 def make_wse_depth_rasters(database_path: str, generate_wse: bool=False, generate_depth: bool=True,
                            output_depth_path: str='data/output_depth.tif',
                             output_wse_path: str =  "data/output_wse_barycentric_interpolation.tif", 
-                             zarr_format: bool = True) -> None:
+                             zarr_format: bool = True, depth_threshold: float = None) -> None:
     """
     The `make_wse_depth_rasters` function generates depth and/or water surface elevation (WSE) rasters 
     from a spatial database and saves them in GeoTIFF or Zarr format.
@@ -133,6 +133,9 @@ def make_wse_depth_rasters(database_path: str, generate_wse: bool=False, generat
         
         - zarr_format (bool, optional):
             Whether to save the output in Zarr format instead of GeoTIFF. Default is True.
+        
+        - depth_threshold (int, optional):
+            Performs a depth mask based on specific threshold i.e., 0.5 feet or 0.1524 m. Default is None.
     
     Output:
         - None:
@@ -203,7 +206,10 @@ def make_wse_depth_rasters(database_path: str, generate_wse: bool=False, generat
         df['row_idx'] = ((df['cell'] - 1) // width).astype(int)
         df['col_idx'] = ((df['cell'] - 1) % width).astype(int)
         raster_array[df['row_idx'].values, df['col_idx'].values] = df[target].values
-
+        # Mask depth raster
+        if i == 0 and depth_threshold is not None:
+            print(f"Applying depth threshold: filtering for depth >= {depth_threshold}")
+            raster_array[raster_array < depth_threshold] = np.nan # 0.5 foot or 0.1524 m 
         # gdal_wirte = True
         # if gdal_wirte:
         #     driver = gdal.GetDriverByName("GTiff")
