@@ -71,53 +71,47 @@ def create_general_mask(database_path: str,
     water =  mask_conn.table(water_table_name).execute()
     water = water.set_crs("EPSG:4326")
 
-    # Setup bounds
-    sch_bb = gpd.GeoDataFrame(geometry=sch_b.buffer(3))
-    sch_bb = sch_bb.dissolve(by=None)
-    state = gpd.overlay(state, sch_bb, how="intersection")
-    levee = gpd.overlay(levee, sch_bb, how="intersection")
-    nwm = gpd.overlay(nwm, sch_bb, how="intersection")
-    water = gpd.overlay(water, sch_bb, how="intersection")
-
     # Implement 5 step masking logic
     # 1. "mask_schism_boundary_atlantic.shp","exterior"
     # 2. "mask_state_boundaries_conus.shp","exterior"
     # 3. "mask_levee_protected_area_conus.shp","interior"
     # 4. "mask_nwm_lakes_conus.shp","interior"
     # 5. "mask_water_polygon_conus.shp","interior" 
-    step_1 = gpd.overlay(sch_bb, sch_b, how='difference')
-    step_1 = step_1[['geometry']]
-    print('Completed step_1 ...')
-    step_2 = gpd.GeoDataFrame(geometry=state.buffer(5))
-    step_2 = step_2.dissolve(by=None)
-    step_2 = gpd.overlay(step_2, state, how='difference')
-    step_2 = gpd.overlay(step_2, sch_b, how='difference')
-    step_2 = gpd.overlay(step_1, step_2, how='union').dissolve(by=None)
-    step_2 = step_2[['geometry']]
-    print('Completed step_2 ...')
-    if dissolve:
-        step_3 = gpd.overlay(step_2, levee, how='union').dissolve(by=None)
-        step_3 = step_3[['geometry']]
-        print('Completed step_3 ...')
-        step_4 = gpd.overlay(step_3, nwm, how='union').dissolve(by=None)
-        step_4 = step_4[['geometry']]
-        print('Completed step_4 ...')
-        step_5 = gpd.overlay(step_4, water, how='union').dissolve(by=None)
-        step_5 = step_5[['geometry']]
-        print('Completed step_5 ...')
-    else:
-        step_3 = gpd.overlay(step_2, levee, how='union')
-        step_3 = step_3[['geometry']]
-        print('Completed step_3 ...')
-        step_4 = gpd.overlay(step_3, nwm, how='union')
-        step_4 = step_4[['geometry']]
-        print('Completed step_4 ...')
-        step_5 = gpd.overlay(step_4, water, how='union')
-        step_5 = step_5[['geometry']]
-        print('Completed step_5 ...')
-    # Ensure crs is set
-    step_5 = step_5.set_crs("EPSG:4326") 
     
+    print("Creating 10-degree ring mask for sch_b ....")
+    sch_b_buffered = gpd.GeoDataFrame(geometry=sch_b.buffer(10))
+    mask_ring_sch_b = gpd.overlay(sch_b_buffered, sch_b, how="difference")
+
+    print("Creating 10-degree ring mask for state boundaries ....")
+    state_buffered = gpd.GeoDataFrame(geometry=state.buffer(10))
+    mask_ring_state = gpd.overlay(state_buffered, state, how="difference")
+
+    print("Defining interior masks for levee, NWM, and water ....")
+    mask_interior_water_raw = gpd.pd.concat([levee, nwm, water], ignore_index=True)
+
+    print("Standardizing geometry column name ....")
+    if 'geom' in mask_interior_water_raw.columns:
+        mask_interior_water_raw = mask_interior_water_raw.rename(columns={'geom': 'geometry'}).set_geometry('geometry')
+    mask_interior_water = mask_interior_water_raw.dropna(subset=['geometry'])
+
+    print("Stacking all valid mask components ....")
+    all_mask_parts = gpd.pd.concat([
+        mask_ring_sch_b,
+        mask_ring_state,
+        mask_interior_water
+    ], ignore_index=True)
+
+    print("Merging all geometries ....")
+    if not all_mask_parts.empty:
+        final_mask_geometry = all_mask_parts.geometry.unary_union
+        step_5 = gpd.GeoDataFrame(geometry=[final_mask_geometry], crs="EPSG:4326")
+    else:
+        step_5 = gpd.GeoDataFrame(geometry=[], crs="EPSG:4326")
+
+    print('Completed mask creation successfully.')
+
+    # Ensure crs is set
+    step_5 = step_5.set_crs("EPSG:4326")
     # Write to database
     directory = 'temp'
     if not os.path.exists(directory):

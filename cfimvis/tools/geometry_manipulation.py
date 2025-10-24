@@ -60,7 +60,11 @@ def write_to_database(database_path: str, table_name: str, df: pd.DataFrame([])=
     
     # Connect to the database
     data_conn = ibis.duckdb.connect(database_path)
-    data_conn.raw_sql('LOAD spatial')
+    try:
+        data_conn.raw_sql('LOAD spatial')
+    except: 
+        data_conn.raw_sql('INSTALL spatial')
+        data_conn.raw_sql('LOAD spatial')
 
     # Handle DataFrames
     if df is not None and not isinstance(df, gpd.GeoDataFrame):

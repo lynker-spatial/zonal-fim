@@ -14,6 +14,7 @@ from rasterio.warp import calculate_default_transform, reproject, Resampling
 import zipfile
 import io
 import os
+import tempfile
 
 
 def convert_elements_file(zip_file_path: str, output_folder_path: str, save_parqeut: bool=True) -> None:
@@ -31,22 +32,37 @@ def convert_elements_file(zip_file_path: str, output_folder_path: str, save_parq
     Returns:
         None
     """
-    with zipfile.ZipFile(zip_file_path, 'r') as z:
-        # Find the shapefile in the zip
-        shapefile_name = [name for name in z.namelist() if name.endswith('.shp')][0]
-        
-        # Read the shapefile into a GeoDataFrame
-        with z.open(shapefile_name) as shp:
-            with io.BytesIO(shp.read()) as shp_bytes:
-                gdf = gpd.read_file(shp_bytes)
+    with tempfile.TemporaryDirectory() as temp_dir:
+        with zipfile.ZipFile(zip_file_path, 'r') as z:
+            z.extractall(temp_dir)
+            
+            shapefile_path = None
+            for root, dirs, files in os.walk(temp_dir):
+                for file in files:
+                    if file.endswith('.shp'):
+                        shapefile_path = os.path.join(root, file)
+                        break
+                if shapefile_path:
+                    break
+            
+            if not shapefile_path:
+                raise FileNotFoundError("No .shp file found within the extracted contents of the zip archive.")
+            gdf = gpd.read_file(shapefile_path)
 
-        # Rename the column elementID to pg_id and select only the pg_id and geometry columns
-        gdf = gdf.rename(columns={'elementID': 'pg_id'})
+    gdf = gdf.rename(columns={'elementID': 'pg_id'})
+    if 'pg_id' in gdf.columns:
         gdf = gdf[['pg_id', 'geometry']]
-        # Save the GeoDataFrame to a GeoPackage file
-        gdf.to_file(output_folder_path+'/ElementPolygons.gpkg', layer="ElementPolygons", driver='GPKG')
-        if save_parqeut:
-            gdf.to_parquet(output_folder_path+'/agElementPolygons.parquet', engine='pyarrow', index=False)
+    else:
+        print("'elementID' column not found. The schema may be different than expected.")
+    
+    os.makedirs(output_folder_path, exist_ok=True)
+    gdf.to_file(os.path.join(output_folder_path, 'ElementPolygons.gpkg'), layer="ElementPolygons", driver='GPKG')
+    
+    if save_parqeut:
+        if not gdf.empty:
+            gdf.to_parquet(os.path.join(output_folder_path, 'agElementPolygons.parquet'), index=False)
+        else:
+            print("GeoDataFrame is empty. Skipping parquet file creation.")
     return
 
 
