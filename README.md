@@ -130,7 +130,7 @@ https://lynker-spatial.s3.us-west-2.amazonaws.com/tabular-resources/zonal_databa
 
 ## Preprocessing Workflow
 
-- visit ![preprocessing folder](preprocesing/README.md) for preprocessing instructions
+- visit [preprocessing folder](preprocesing/README.md) for preprocessing instructions
 
 
 ## Testing

@@ -85,7 +85,7 @@ if __name__ == '__main__':
 
     if generate_mask:
         print('Creating single mask ...')
-        fd.convert_elements_file(shape_file_folder_path=shape_file_folder_path,output_folder_path=output_folder_path)
+        fd.convert_elements_file(zip_file_path=shape_file_folder_path,output_folder_path=output_folder_path)
         mb.create_general_mask(database_path=mask_database_path,
                                 schisim_table_name=schisim_table_name, state_table_name=state_table_name,
                                 levee_table_name=levee_table_name, nwm_table_name=nwm_table_name,

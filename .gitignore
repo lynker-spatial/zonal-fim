@@ -38,8 +38,9 @@ failed_downloads.txt
 *.gpkg
 *.db
 *.tif
+*.fgb
+tests/*.ipynb
 tests/test_database.py
-tests/tests.ipynb
 
 # Folders
 .vscode/settings.json
