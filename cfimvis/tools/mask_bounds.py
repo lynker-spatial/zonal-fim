@@ -149,7 +149,7 @@ def mask_triangles(database_path: str, triangles_path: str) -> None:
         CREATE OR REPLACE TABLE triangles AS 
         SELECT t.* 
         FROM '{triangles_path}' t
-        WHERE t.pg_id IN (SELECT pg_id FROM masked_coverage_fraction)
+        SEMI JOIN masked_coverage_fraction AS mcf ON t.pg_id = mcf.pg_id; -- slower method WHERE t.pg_id IN (SELECT pg_id FROM masked_coverage_fraction)
         """
     )
     data_conn.con.close()

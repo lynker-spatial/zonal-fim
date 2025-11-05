@@ -7,11 +7,8 @@ from rasterio.features import shapes
 import pandas as pd
 import geopandas as gpd
 from shapely.geometry import shape
-from rasterio.session import AWSSession
 from rio_tiler.errors import PointOutsideBounds
 from rio_tiler.io import COGReader
-import rasterio
-import boto3
 import numpy as np
 from tqdm import tqdm
 import os

@@ -2,7 +2,7 @@
 
 import argparse
 import time
-import os
+import gc
 import cfimvis.tools.mask_bounds as mb
 import cfimvis.tools.geometry_manipulation as gm
 import cfimvis.tools.read_schisim as rs
@@ -36,7 +36,7 @@ if __name__ == '__main__':
     parser.add_argument('-o','--dem_path',help='dem_path', required=False, type=str, default='')
     parser.add_argument('-m','--depth_path',help='depth raster path to save the file to if zarr format is chosen it automatically converts tif extension to zarr  e.g., /data/raster_v1.tif', required=False, type=str, default='')
     parser.add_argument('-q','--wse_path',help='wse raster path to save the file to if zarr format is chosen it automatically converts tif extension to zarr  e.g., /data/raster_v1.tif', required=False, type=str, default='')
-    parser.add_argument('-i','--file_path',help='gr3_file_path',required=False,type=str, default='')
+    parser.add_argument('-i','--file_path',help='gr3_file_path (for preprocessing/latest is hgrid.gr3) or .nc file (for execution)',required=False,type=str, default='')
     parser.add_argument('-k','--shape_file_folder_path',help='shape_file_folder_path for schisim elements',required=False,type=str, default='')
     parser.add_argument('-v','--node_id_path',help='node_id_path for schisim node mapping from gr3 to nc',required=False,type=str, default='')
     parser.add_argument('-l','--output_folder_path',help='output_folder_path for schisim elements',required=False,type=str, default='')
@@ -50,6 +50,8 @@ if __name__ == '__main__':
     parser.add_argument('-t','--nwm_table_name',help='Name of the National Water Model table in the DuckDB database.',required=False,type=str, default="interior_mask_nwm_lakes_conus_atlgulf")
     parser.add_argument('-f','--water_table_name',help='Name of the water bodies table in the DuckDB database.',required=False,type=str, default="interior_mask_water_polygon_conus_atlgulf")
     parser.add_argument('-s','--dissolve',help='Whether to dissolve overlapping geometries at each stage.',required=False, type=str_to_bool, default=True)
+    parser.add_argument('-lm','--low_memory',help='A flag that switches between memory-efficient and standard processing methods.',required=False, type=str_to_bool, default=True)
+    parser.add_argument('-of','--output_format',help='Output format; choose from COG, ZARR, IN_MEMORY.',required=False, type=str, default='COG')
     parser.add_argument('-vv','--verbose',help='verbose true to print',required=False,type=str_to_bool,default=True)
 
     args = vars(parser.parse_args())
@@ -78,9 +80,10 @@ if __name__ == '__main__':
     nwm_table_name = args['nwm_table_name']
     water_table_name = args['water_table_name']
     dissolve = args['dissolve']
+    low_memory_mode = args['low_memory']
+    output_format = args['output_format']
     verbose = args['verbose']
     print(f"elevation_threshold: {elevation_threshold}")
-    vc.validate_paths(database_path, file_path)
     print('\n')
 
     if generate_mask:
@@ -101,6 +104,10 @@ if __name__ == '__main__':
         # fd.reproject_dem(dem_path, output_dem_path)
         # print('Reprojection complete.\n')
         # Ingest coverage fraction data
+        print('Setup database ...')
+        fd.setup_databse(database_path)
+        vc.validate_paths(database_path, file_path)
+        print('Database setup complete.\n')
         print('Ingesting node ids ...')
         fd.setup_crosswalk_table(database_path, node_id_path)
         print('Added node crosswalk to duckdb.\n')
@@ -166,27 +173,56 @@ if __name__ == '__main__':
         # output triangle_barycentric
         print('Completed barycentric interpolation.')
         print(f"Time taken for section 2: {time_section_2:.2f} seconds \n")
-
+        gc.collect()
         print('Zonal Interpolation...')
         start_section_3 = time.time()
-        bi.interpolate(database_path=database_path)
-        end_section_3 = time.time()
-        time_section_3 = end_section_3 - start_section_3
-        print('Completed zonal interpolation.')
-        print(f"Time taken for section 3: {time_section_3:.2f} seconds \n")
-       
-        print('\nWriting rasters...')
-        start_section_4 = time.time()
-        bi.make_wse_depth_rasters(database_path=database_path,
-                                    generate_depth=generate_depth, output_depth_path=depth_path, 
-                                    output_wse_path=wse_path, generate_wse=generate_wse, 
-                                    zarr_format=zarr_format, depth_threshold=depth_threshold)
-        end_section_4 = time.time()
-        time_section_4 = end_section_4 - start_section_4
-        print('Completed writing rasters.')
-        print(f"Time taken for section 4: {time_section_4:.2f} seconds\n")
+        if low_memory_mode:
+            if output_format == 'IN_MEMORY':
+                in_memory_rasters = bi.interpolate_and_rasterize(database_path=database_path,
+                                            source_file_path=file_path,
+                                            output_format=output_format,
+                                            generate_depth=generate_depth,
+                                            generate_wse=generate_wse,
+                                            output_path=depth_path,
+                                            depth_threshold=depth_threshold)
+                print('Completed interpolation and returned in-memory GDAL datasets.')
+                # Any other logic to handle in-memory datasets can be added here ...
+                # ...
+            else:
+                bi.interpolate_and_rasterize(database_path=database_path,
+                                            source_file_path=file_path,
+                                            output_format=output_format,
+                                            generate_depth=generate_depth,
+                                            generate_wse=generate_wse,
+                                            output_path=depth_path,
+                                            depth_threshold=depth_threshold)
+                print('Completed interpolation and file generation.')
+            end_section_3 = time.time()
+            time_section_3 = end_section_3 - start_section_3
+            print(f"Time taken for section 3: {time_section_3:.2f} seconds \n")
+            total_time = time_section_1 + time_section_2 + time_section_3 
 
-        total_time = time_section_1 + time_section_2 + time_section_3 + time_section_4
+        else:
+            bi.interpolate(database_path=database_path)
+            end_section_3 = time.time()
+            time_section_3 = end_section_3 - start_section_3
+            print('Completed zonal interpolation.')
+            print(f"Time taken for section 3: {time_section_3:.2f} seconds \n")
+            gc.collect()
+        
+            print('\nWriting rasters...')
+            start_section_4 = time.time()
+            bi.make_wse_depth_rasters(database_path=database_path,
+                                        generate_depth=generate_depth, output_depth_path=depth_path, 
+                                        output_wse_path=wse_path, generate_wse=generate_wse, 
+                                        zarr_format=zarr_format, depth_threshold=depth_threshold)
+
+            end_section_4 = time.time()
+            time_section_4 = end_section_4 - start_section_4
+            print('Completed writing rasters.')
+            print(f"Time taken for section 4: {time_section_4:.2f} seconds\n")
+            total_time = time_section_1 + time_section_2 + time_section_3 + time_section_4
+
         total_hours = int(total_time // 3600)
         total_minutes = int((total_time % 3600) // 60)
         total_seconds = total_time % 60
