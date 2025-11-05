@@ -1,4 +1,4 @@
-# Coastal-FIM:<a href="https://github.com/owp-spatial/zonal-fim.git"><img src="assets/images/zonal_dim_logo.png" align="right" width="35%"/></a>
+# Coastal-FIM:<a href="https://github.com/owp-spatial/zonal-fim.git"><img src="assets/images/coastal_fim_logo.png" align="right" width="35%"/></a>
 
 <!-- badges: start -->
 [![Test Workflow Status](https://github.com/owp-spatial/zonal-fim/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/owp-spatial/zonal-fim/actions/workflows/test.yml)
@@ -122,10 +122,54 @@ https://lynker-spatial.s3.us-west-2.amazonaws.com/tabular-resources/zonal_databa
    python zonal_fim.py --generate_mask False --preprocess False --generate_wse True --generate_depth True --zarr_format False  --execute True  --dissolve False -dt 0.1524 -i '/path/nwm.nc' -c '/path/zonal_database.duckdb' -m '/path/depth_raser_v1.tif' -q '/path/wse_raser_v1.tif'
    ```
 
-3. **Output**:
-   - Barycentric interpolation is saved as depth table in the DuckDB database.
-   - Can write WSE interpolation and depth values as .tif and .zarr file if specified. 
+3. **low-memory option**:
+   There is an optional low memory option (`--low_memory` or `-lm`) for execution of coastal FIM and generation of the maps that gives users control over resource management, allowing to adapt the workflow to different hardware constraints or performance goals. Setting this flag is highly recommanded. To Set low_memory falg: </br>
+   ```shell
+   python zonal_fim.py --generate_mask False --preprocess False --generate_wse True --generate_depth True --zarr_format False  --execute True  --dissolve False --low_memory True -i '/path/nwm.nc' -c '/path/zonal_database.duckdb' -m '/path/depth_raser_v1.tif' -q '/path/wse_raser_v1.tif'
+   ```
 
+4. **Output**:
+   The script's final output can be delivered in one of three formats, controlled by the --output_format flag. This design provides flexibility, allowing you to either generate standard GIS files, create modern cloud-native data stores, or build high-performance in-memory data pipelines.
+
+   `Note:` All intermediate calculations, such as the final interpolated depth and WSE values, are materialized as tables within the DuckDB database before being converted into the chosen output format so they can be used directly to generate any other file format.
+   
+   ***Option 1: Cloud Optimized GeoTIFF (--output_format 'COG')***
+   It produces istandard raster files that can be used in any desktop GIS software or web mapping application. </br>
+   What it Creates: </br>
+   One or more .tif files (e.g., depth.tif, wse.tif). </br>
+   Files are written in the Cloud Optimized GeoTIFF (COG) format. This is a special type of GeoTIFF that is structured for efficient access over networks. It contains internal tiling and overviews. </br>
+   This is done by adding `--output_format 'COG'` </br>
+   ```shell
+   python zonal_fim.py --generate_mask False --preprocess False --generate_wse True --generate_depth True --zarr_format False  --execute True  --dissolve False --low_memory True  --output_format 'COG' -i '/path/nwm.nc' -c '/path/zonal_database.duckdb' -m '/path/depth_raser_v1.tif' -q '/path/wse_raser_v1.tif'
+   ```
+   
+   ***Option 2: Zarr Store (--output_format 'ZARR')***
+   This option creates a modern, high-performance, cloud-native data store. Zarr is a format designed for chunked, compressed, N-dimensional arrays, making it ideal for large-scale scientific computing and parallel processing. </br>
+   What it Creates: </br>
+   A directory on the file system (e.g., atlgulf_fim.zarr/). </br>
+   Inside this directory, a new raster array is added for each model run and variable (e.g., nwm.t00z.analysis_wse, nwm.t00z.analysis_depth). </br>
+   The store is append-friendly; running the script with a new input file will add new arrays to the existing Zarr store without overwriting previous results. </br>
+   Use Case: </br>
+   Building a centralized data store for many model runs. </br>
+   Serving as a high-performance backend for data analysis with Python libraries like Xarray and Dask. </br>
+   Providing a direct source for on-the-fly tile servers that can read chunked data efficiently. </br>
+   This is done by adding `--output_format 'ZARR'` </br>
+   ```shell
+   python zonal_fim.py --generate_mask False --preprocess False --generate_wse True --generate_depth True --zarr_format False  --execute True  --dissolve False --low_memory True  --output_format 'ZARR' -i '/path/nwm.nc' -c '/path/zonal_database.duckdb' -m '/path/depth_raser_v1.tif' -q '/path/wse_raser_v1.tif'
+   ```
+
+   ***Option 3: In-Memory GDAL Datasets (--output_format 'IN_MEMORY')***
+   This is an advanced option for developers building integrated Python data pipelines. Instead of writing any files to disk, the function creates the final rasters in RAM and returns them as GDAL Dataset objects. </br>
+   What it Creates: </br>
+   No files are written to disk. </br>
+   The script's main function returns a Python dictionary where keys ('depth', 'wse') map to in-memory gdal.Dataset objects. Further develiopments can be made in continuation of the script to use in-memory array.</br>
+   Use Case: </br>
+   High-performance workflows where the raster data needs to be immediately passed to another Python function for further processing (e.g., calculating statistics, generating a map thumbnail, re-projecting, etc.). </br>
+   Eliminating slow disk I/O when the final raster is only an intermediate step in a larger automated pipeline. </br>
+   This is done by adding `--output_format 'IN_MEMORY'` </br>
+   ```shell
+   python zonal_fim.py --generate_mask False --preprocess False --generate_wse True --generate_depth True --zarr_format False  --execute True  --dissolve False --low_memory True  --output_format 'IN_MEMORY' -i '/path/nwm.nc' -c '/path/zonal_database.duckdb' -m '/path/depth_raser_v1.tif' -q '/path/wse_raser_v1.tif'
+   ```
 ---
 
 ## Preprocessing Workflow

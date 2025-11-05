@@ -1,21 +1,32 @@
 # format_data.py
-
-import duckdb
 import ibis
 from ibis import _
 import json
 import geopandas as gpd
 import pandas as pd 
 import rasterio
-from pathlib import Path
 import rasterio
 from rasterio.crs import CRS
 from rasterio.warp import calculate_default_transform, reproject, Resampling
 import zipfile
-import io
 import os
 import tempfile
 
+
+def setup_databse(database_path: str) -> None:
+    """
+    Sets up a DuckDB database with spatial extension loaded.
+
+    Args:
+        database_path (str): Path to the DuckDB database file.
+
+    The function establishes a connection to the DuckDB database and loads the spatial extension.
+    """
+    data_conn = ibis.duckdb.connect(database_path)
+    data_conn.raw_sql('INSTALL spatial')
+    data_conn.raw_sql('LOAD spatial')
+    data_conn.con.close()
+    return
 
 def convert_elements_file(zip_file_path: str, output_folder_path: str, save_parqeut: bool=True) -> None:
     """
