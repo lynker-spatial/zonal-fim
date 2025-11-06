@@ -7,21 +7,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4 
+      uses: actions/checkout@v4
 
     - name: Setup Miniconda
-      uses: conda-incubator/setup-miniconda@v3 
+      uses: conda-incubator/setup-miniconda@v3
       with:
+        python-version: "3.12"
         auto-update-conda: true
         environment-file: environment.yml
         activate-environment: coastal_fim_vis
-        mamba-version: "*"
-        use-only-tar-bz2: true 
+        mamba-version: "2.3.2"
 
     - name: Run tests
       shell: bash -l {0}
       run: |
         echo "Verifying GDAL drivers."
         python -c "from osgeo import gdal; print(f'GDAL Version: {gdal.__version__}'); print('COG' in [gdal.GetDriver(i).ShortName for i in range(gdal.GetDriverCount())])"
+        
         export PYTHONPATH=$PYTHONPATH:.
         pytest tests/
