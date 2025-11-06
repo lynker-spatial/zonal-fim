@@ -25,4 +25,3 @@ jobs:
         python -c "from osgeo import gdal; print(f'GDAL Version: {gdal.__version__}'); print('COG' in [gdal.GetDriver(i).ShortName for i in range(gdal.GetDriverCount())])"
         export PYTHONPATH=$PYTHONPATH:.
         pytest tests/
-      shell: bash -l {0}
