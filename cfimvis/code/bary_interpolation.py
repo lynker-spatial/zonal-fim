@@ -266,69 +266,83 @@ def interpolate_and_rasterize(database_path: str, source_file_path: str, output_
     if output_format not in valid_formats:
         raise ValueError(f"output_format must be one of {valid_formats}, got '{output_format}'")
 
+    if not generate_depth and not generate_wse:
+        print("Both generate_depth and generate_wse are False. No output will be generated.")
+        return None
+
     data_conn = ibis.duckdb.connect(database_path)
     data_conn.raw_sql('LOAD spatial')
-  
-    merged_polys = data_conn.table("triangle_barycentric").select('pg_id', 'wse_weighted_average')
-    z_w = data_conn.table("masked_coverage_fraction").select('pg_id', 'cell', 'coverage_fraction', 'elevation')
+    temp_parquet_path = f"temp_results_{uuid.uuid4().hex}.parquet"
+    gdal_datasets = {}
 
-    print("Calculating cell wise weighted average WSE.")
-    z_w_merged_expr = z_w.join(merged_polys, z_w.pg_id == merged_polys.pg_id, how='left')
-    wse_avg_expr = (
-        z_w_merged_expr.group_by('cell')
-        .aggregate(
-            wse_cell_weighted_average=(
-                (z_w_merged_expr.wse_weighted_average * z_w_merged_expr.coverage_fraction).sum() /
-                z_w_merged_expr.coverage_fraction.sum()
+    try:
+        merged_polys = data_conn.table("triangle_barycentric").select('pg_id', 'wse_weighted_average')
+        z_w = data_conn.table("masked_coverage_fraction").select('pg_id', 'cell', 'coverage_fraction', 'elevation')
+
+        print("Calculating cell wise weighted average WSE.")
+        z_w_merged_expr = z_w.join(merged_polys, z_w.pg_id == merged_polys.pg_id, how='left')
+        wse_avg_expr = (
+            z_w_merged_expr.group_by('cell')
+            .aggregate(
+                wse_cell_weighted_average=(
+                    (z_w_merged_expr.wse_weighted_average * z_w_merged_expr.coverage_fraction).sum() /
+                    z_w_merged_expr.coverage_fraction.sum()
+                )
             )
         )
-    )
-    data_conn.create_table("temp_cell_wse_avg", wse_avg_expr, overwrite=True)
+        data_conn.create_table("temp_cell_wse_avg", wse_avg_expr, overwrite=True)
 
-    print("Extracting unique elevation per cell.")
-    cell_elevation_agg = (
-        z_w.group_by("cell")
-        .aggregate(elevation=z_w.elevation.first())
-    )
-    cell_elevation_expr = cell_elevation_agg.filter(
-        ~cell_elevation_agg.elevation.isnan()
-    )    
-    data_conn.create_table("temp_cell_elevation", cell_elevation_expr, overwrite=True)
+        print("Extracting unique elevation per cell.")
+        cell_elevation_agg = (
+            z_w.group_by("cell")
+            .aggregate(elevation=z_w.elevation.first())
+        )
+        cell_elevation_expr = cell_elevation_agg.filter(~cell_elevation_agg.elevation.isnan())
+        data_conn.create_table("temp_cell_elevation", cell_elevation_expr, overwrite=True)
 
-    wse_table = data_conn.table("temp_cell_wse_avg")
-    elev_table = data_conn.table("temp_cell_elevation")
+        wse_table = data_conn.table("temp_cell_wse_avg")
+        elev_table = data_conn.table("temp_cell_elevation")
 
-    final_table_expr = wse_table.join(
-        elev_table,
-        wse_table.cell == elev_table.cell,
-        how='inner'
-    )
+        final_table_expr = wse_table.join(
+            elev_table, wse_table.cell == elev_table.cell, how='inner'
+        ).mutate(
+            depth=(ibis._.wse_cell_weighted_average - ibis._.elevation)
+        )
 
-    final_table_expr = final_table_expr.mutate(
-        depth=(final_table_expr.wse_cell_weighted_average - final_table_expr.elevation)
-    ).select("cell", "wse_cell_weighted_average", "depth")
+        if depth_threshold is None:
+            depth_threshold = 0.0
+        final_table_expr = final_table_expr.filter(final_table_expr.depth >= depth_threshold)
 
-    if depth_threshold is None:
-        depth_threshold = 0.0
-    final_table_expr = final_table_expr.filter(final_table_expr.depth >= depth_threshold)
+        columns_to_select = ['cell']
+        if generate_wse:
+            columns_to_select.append('wse_cell_weighted_average')
+        if generate_depth:
+            columns_to_select.append('depth')
+        
+        final_table_expr = final_table_expr.select(*columns_to_select)
+        final_table_expr.to_parquet(temp_parquet_path)
 
-    dem_metadata_table = data_conn.table('dem_metadata')
-    dem_meta = dem_metadata_table.filter(dem_metadata_table['dem_metadata'] == 'DEM').execute()
+        data_table_from_parquet = data_conn.read_parquet(temp_parquet_path)
+        
+        result_count = data_table_from_parquet.count().execute()
+        print(f"Materialized {result_count:,} valid data cells with depth >= {depth_threshold}.")
+        if result_count == 0:
+            print("No data remains after filtering. Output will be empty but valid.")
 
-    # Output Generation Logic
-    try:
+        dem_metadata_table = data_conn.table('dem_metadata')
+        dem_meta = dem_metadata_table.filter(dem_metadata_table['dem_metadata'] == 'DEM').execute()
         base_name = os.path.splitext(os.path.basename(source_file_path))[0]
 
         if output_format == 'COG':
             if generate_wse:
-                make_wse_depth_cogs(data_table=final_table_expr.select("cell", "wse_cell_weighted_average"), 
-                                    dem_meta=dem_meta, 
-                                    target_column='wse_cell_weighted_average', 
-                                    output_cog_path=output_path.replace('depth','wse'))
+                make_wse_depth_cogs(data_table=data_table_from_parquet.select("cell", "wse_cell_weighted_average"),
+                                    dem_meta=dem_meta,
+                                    target_column='wse_cell_weighted_average',
+                                    output_cog_path=output_path.replace('depth', 'wse'))
             if generate_depth:
-                make_wse_depth_cogs(data_table=final_table_expr.select("cell", "depth"), 
-                                    dem_meta=dem_meta, 
-                                    target_column='depth', 
+                make_wse_depth_cogs(data_table=data_table_from_parquet.select("cell", "depth"),
+                                    dem_meta=dem_meta,
+                                    target_column='depth',
                                     output_cog_path=output_path)
             return None
 
@@ -336,55 +350,48 @@ def interpolate_and_rasterize(database_path: str, source_file_path: str, output_
             output_dir = os.path.dirname(output_path)
             zarr_store_path = os.path.join(output_dir, "atlgulf_fim.zarr")
             if generate_wse:
-                write_ibis_to_zarr(data_table=final_table_expr.select("cell", "wse_cell_weighted_average"), 
-                                   dem_meta=dem_meta, 
-                                   target_column='wse_cell_weighted_average', 
-                                   output_zarr_path=zarr_store_path, 
+                write_ibis_to_zarr(data_table=data_table_from_parquet.select("cell", "wse_cell_weighted_average"),
+                                   dem_meta=dem_meta,
+                                   target_column='wse_cell_weighted_average',
+                                   output_zarr_path=zarr_store_path,
                                    array_name=f"{base_name}_wse")
             if generate_depth:
-                write_ibis_to_zarr(data_table=final_table_expr.select("cell", "depth"), 
-                                   dem_meta=dem_meta, 
-                                   target_column='depth', 
-                                   output_zarr_path=zarr_store_path, 
+                write_ibis_to_zarr(data_table=data_table_from_parquet.select("cell", "depth"),
+                                   dem_meta=dem_meta,
+                                   target_column='depth',
+                                   output_zarr_path=zarr_store_path,
                                    array_name=f"{base_name}_depth")
             return None
 
         elif output_format == 'IN_MEMORY':
-            print("Materializing final results into a temporary table.")
-            materialized_table_name = "temp_final_results"
-            data_conn.create_table(materialized_table_name, final_table_expr, overwrite=True)
-            materialized_table = data_conn.table(materialized_table_name)
-            result_count = materialized_table.count().execute()
-            print(f"Materialized {result_count:,} valid data cells with depth >= {depth_threshold}.")
-            if result_count == 0:
-                print("No data remains after filtering. Output will be empty but valid.")
-
-            base_name = os.path.splitext(os.path.basename(source_file_path))[0]
-            gdal_datasets = {}
             if generate_wse:
                 gdal_datasets['wse'] = create_in_memory_gdal_array(
-                    data_table=materialized_table.select("cell", "wse_cell_weighted_average"),
+                    data_table=data_table_from_parquet.select("cell", "wse_cell_weighted_average"),
                     dem_meta=dem_meta, target_column='wse_cell_weighted_average'
                 )
             if generate_depth:
                 gdal_datasets['depth'] = create_in_memory_gdal_array(
-                    data_table=materialized_table.select("cell", "depth"),
+                    data_table=data_table_from_parquet.select("cell", "depth"),
                     dem_meta=dem_meta, target_column='depth'
                 )
-            
             return gdal_datasets
 
     finally:
         try:
             data_conn.drop_table("temp_cell_wse_avg", force=True)
             data_conn.drop_table("temp_cell_elevation", force=True)
-            if 'materialized_table_name' in locals():
-                data_conn.drop_table(materialized_table_name, force=True)
         except Exception as e:
-            print(f"Could not drop all temporary tables. Manual cleanup may be needed. Error: {e}")
+            print(f"Could not drop temporary tables. Manual cleanup may be needed. Error: {e}")
+        
+        if os.path.exists(temp_parquet_path):
+            try:
+                os.remove(temp_parquet_path)
+            except OSError as e:
+                print(f"Error removing temporary parquet file '{temp_parquet_path}': {e}")
         
         if data_conn and data_conn.con:
              data_conn.con.close()
+        
         print("Interpolation process complete.")
 
 def write_ibis_to_zarr(data_table: ibis.expr.types.Table, dem_meta: pd.DataFrame, target_column: str,
