@@ -3,6 +3,7 @@
 import argparse
 import time
 import gc
+import os
 import cfimvis.tools.mask_bounds as mb
 import cfimvis.tools.geometry_manipulation as gm
 import cfimvis.tools.read_schisim as rs
@@ -177,26 +178,54 @@ if __name__ == '__main__':
         print('Zonal Interpolation...')
         start_section_3 = time.time()
         if low_memory_mode:
-            if output_format == 'IN_MEMORY':
-                in_memory_rasters = bi.interpolate_and_rasterize(database_path=database_path,
-                                            source_file_path=file_path,
-                                            output_format=output_format,
-                                            generate_depth=generate_depth,
-                                            generate_wse=generate_wse,
-                                            output_path=depth_path,
-                                            depth_threshold=depth_threshold)
-                print('Completed interpolation and returned in-memory GDAL datasets.')
-                # Any other logic to handle in-memory datasets can be added here ...
-                # ...
-            else:
-                bi.interpolate_and_rasterize(database_path=database_path,
-                                            source_file_path=file_path,
-                                            output_format=output_format,
-                                            generate_depth=generate_depth,
-                                            generate_wse=generate_wse,
-                                            output_path=depth_path,
-                                            depth_threshold=depth_threshold)
-                print('Completed interpolation and file generation.')
+            temp_parquet_path = None
+            try:
+                print('Computing Barycentric Values.')
+                temp_parquet_path = bi.compute_barycentric_values(
+                    database_path=database_path,
+                    generate_depth=generate_depth,
+                    generate_wse=generate_wse,
+                    depth_threshold=depth_threshold
+                )
+
+                if temp_parquet_path:
+                    print('Rasterizing computed values.')
+                    if output_format == 'IN_MEMORY':
+                        in_memory_rasters = bi.rasterize_barycentric_values(
+                            parquet_path=temp_parquet_path,
+                            database_path=database_path,
+                            source_file_path=file_path,
+                            output_format=output_format,
+                            generate_depth=generate_depth,
+                            generate_wse=generate_wse,
+                            depth_path=depth_path,
+                            wse_path=wse_path
+                        )
+                        print('Completed interpolation and returned in-memory GDAL datasets.')
+                        # Any other logic to handle in-memory datasets can be added here ...
+                        # ...
+                    else:
+                        bi.rasterize_barycentric_values(
+                            parquet_path=temp_parquet_path,
+                            database_path=database_path,
+                            source_file_path=file_path,
+                            output_format=output_format,
+                            generate_depth=generate_depth,
+                            generate_wse=generate_wse,
+                            depth_path=depth_path,
+                            wse_path=wse_path
+                        )
+                        print('Completed interpolation and file generation.')
+                else:
+                    print("No data generated during computation step.")
+
+            finally:
+                if temp_parquet_path and os.path.exists(temp_parquet_path):
+                    try:
+                        os.remove(temp_parquet_path)
+                        print("Temporary intermediate files cleaned up.")
+                    except OSError as e:
+                        print(f"Error removing temporary file: {e}")
             end_section_3 = time.time()
             time_section_3 = end_section_3 - start_section_3
             print(f"Time taken for section 3: {time_section_3:.2f} seconds \n")

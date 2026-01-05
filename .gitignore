@@ -41,6 +41,9 @@ failed_downloads.txt
 *.fgb
 tests/*.ipynb
 tests/test_database.py
+download_nwm.py
+exe_bash.sh
+run_nwm_update.sh
 
 # Folders
 .vscode/settings.json
