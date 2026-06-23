@@ -1,5 +1,3 @@
-# test_mask.py
-
 import argparse
 import time
 import gc
@@ -54,6 +52,7 @@ if __name__ == '__main__':
     parser.add_argument('-lm','--low_memory',help='A flag that switches between memory-efficient and standard processing methods.',required=False, type=str_to_bool, default=True)
     parser.add_argument('-of','--output_format',help='Output format; choose from COG, ZARR, IN_MEMORY.',required=False, type=str, default='COG')
     parser.add_argument('-vv','--verbose',help='verbose true to print',required=False,type=str_to_bool,default=True)
+    parser.add_argument('-og','--output_gpkg_path',help='Path to export the final combined mask as a GeoPackage',required=False,type=str,default=None)
 
     args = vars(parser.parse_args())
     generate_mask = args['generate_mask']
@@ -84,16 +83,27 @@ if __name__ == '__main__':
     low_memory_mode = args['low_memory']
     output_format = args['output_format']
     verbose = args['verbose']
+    output_gpkg_path = args['output_gpkg_path']
+    
     print(f"elevation_threshold: {elevation_threshold}")
     print('\n')
 
     if generate_mask:
         print('Creating single mask ...')
-        fd.convert_elements_file(zip_file_path=shape_file_folder_path,output_folder_path=output_folder_path)
+        
+        if shape_file_folder_path and output_folder_path:
+            fd.convert_elements_file(zip_file_path=shape_file_folder_path, output_folder_path=output_folder_path)
+        else:
+            print('Skipping shapefile extraction (paths for zip extraction not provided).')
+
         mb.create_general_mask(database_path=mask_database_path,
-                                schisim_table_name=schisim_table_name, state_table_name=state_table_name,
-                                levee_table_name=levee_table_name, nwm_table_name=nwm_table_name,
-                                water_table_name=water_table_name, dissolve=dissolve)
+                               schisim_table_name=schisim_table_name,
+                               state_table_name=state_table_name,
+                               levee_table_name=levee_table_name if levee_table_name else None,
+                               nwm_table_name=nwm_table_name if nwm_table_name else None,
+                               water_table_name=water_table_name if water_table_name else None,
+                               dissolve=dissolve,
+                               output_gpkg_path=output_gpkg_path if output_gpkg_path else None)
         print('Masking complete. \n')
     # #_____________________________
 
@@ -259,4 +269,3 @@ if __name__ == '__main__':
         # Print total time in hours, minutes, and seconds
         print(f"Total time taken: {total_hours} hours, {total_minutes} minutes, {total_seconds:.2f} seconds")
         print('Script end.')
-
