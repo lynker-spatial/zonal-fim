@@ -155,7 +155,9 @@ def make_wse_depth_cogs(data_table: ibis.expr.types.Table, dem_meta: pd.DataFram
                 if not result:
                     continue
                 x_offset, y_offset, sparse_tile = result 
-                existing_tile = band.ReadAsArray(x_offset, y_offset, block_size, block_size)
+                win_xsize = min(block_size, width - x_offset)
+                win_ysize = min(block_size, height - y_offset)
+                existing_tile = band.ReadAsArray(x_offset, y_offset, win_xsize, win_ysize)
                 if existing_tile is None:
                     continue
                 existing_tile = np.array(existing_tile, dtype=np.float32)
@@ -640,9 +642,11 @@ def write_ibis_to_zarr(data_table: ibis.expr.types.Table, dem_meta: pd.DataFrame
             relative_cols = block_df['col'].values - x_off
             tile[relative_rows, relative_cols] = block_df['value'].values
             
-            y_slice = slice(y_off, y_off + chunk_size)
-            x_slice = slice(x_off, x_off + chunk_size)
-            z_array[y_slice, x_slice] = tile
+            win_xsize = min(chunk_size, width - x_off)
+            win_ysize = min(chunk_size, height - y_off)
+            y_slice = slice(y_off, y_off + win_ysize)
+            x_slice = slice(x_off, x_off + win_xsize)
+            z_array[y_slice, x_slice] = tile[:win_ysize, :win_xsize]
         
         del chunk_df, df_for_grouping, grouped
         gc.collect()
@@ -736,7 +740,10 @@ def create_in_memory_gdal_array(data_table: ibis.expr.types.Table, dem_meta: pd.
             relative_rows = block_df['row'].values - y_off
             relative_cols = block_df['col'].values - x_off
             tile[relative_rows, relative_cols] = block_df['value'].values
-            band.WriteArray(tile, xoff=x_off, yoff=y_off)
+            
+            win_xsize = min(block_size, width - x_off)
+            win_ysize = min(block_size, height - y_off)
+            band.WriteArray(tile[:win_ysize, :win_xsize], xoff=x_off, yoff=y_off)
 
         del chunk_df, df_for_grouping, grouped
         # gc.collect()

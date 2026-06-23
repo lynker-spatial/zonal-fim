@@ -3,6 +3,7 @@ import duckdb
 import ibis
 from ibis import _
 import geopandas as gpd
+import pandas as pd
 import os
 import rasterio
 from rasterio.mask import mask
@@ -11,8 +12,9 @@ ibis.options.interactive = True
 
 def create_general_mask(database_path: str,
                         schisim_table_name: str, state_table_name: str,
-                        levee_table_name: str, nwm_table_name: str,
-                        water_table_name: str, dissolve: bool) -> None:
+                        levee_table_name: str = None, nwm_table_name: str = None,
+                        water_table_name: str = None, dissolve: bool = True,
+                        output_gpkg_path: str = None) -> None:
     
     """
     Creates a general coastal mask using spatial data from various input sources 
@@ -26,14 +28,16 @@ def create_general_mask(database_path: str,
         Name of the SCHISM table in the DuckDB database.
     state_table_name : str
         Name of the state boundaries table in the DuckDB database.
-    levee_table_name : str
+    levee_table_name : str, optional
         Name of the levee data table in the DuckDB database.
-    nwm_table_name : str
+    nwm_table_name : str, optional
         Name of the National Water Model table in the DuckDB database.
-    water_table_name : str
+    water_table_name : str, optional
         Name of the water bodies table in the DuckDB database.
     dissolve : bool
         Whether to dissolve overlapping geometries at each stage.
+    output_gpkg_path : str, optional
+        If provided, the final mask is exported to this file path as a GeoPackage.
 
     Returns:
     --------
@@ -64,12 +68,23 @@ def create_general_mask(database_path: str,
     sch_b = sch_b.set_crs("EPSG:4326")
     state = mask_conn.table(state_table_name).execute()
     state = state.set_crs("EPSG:4326")
-    levee =  mask_conn.table(levee_table_name).execute()
-    levee = levee.set_crs("EPSG:4326")
-    nwm =  mask_conn.table(nwm_table_name).execute()
-    nwm = nwm.set_crs("EPSG:4326")
-    water =  mask_conn.table(water_table_name).execute()
-    water = water.set_crs("EPSG:4326")
+
+    interior_gdfs = []
+    
+    if levee_table_name:
+        levee = mask_conn.table(levee_table_name).execute()
+        levee = levee.set_crs("EPSG:4326")
+        interior_gdfs.append(levee)
+        
+    if nwm_table_name:
+        nwm = mask_conn.table(nwm_table_name).execute()
+        nwm = nwm.set_crs("EPSG:4326")
+        interior_gdfs.append(nwm)
+        
+    if water_table_name:
+        water = mask_conn.table(water_table_name).execute()
+        water = water.set_crs("EPSG:4326")
+        interior_gdfs.append(water)
 
     # Implement 5 step masking logic
     # 1. "mask_schism_boundary_atlantic.shp","exterior"
@@ -86,16 +101,20 @@ def create_general_mask(database_path: str,
     state_buffered = gpd.GeoDataFrame(geometry=state.buffer(10))
     mask_ring_state = gpd.overlay(state_buffered, state, how="difference")
 
-    print("Defining interior masks for levee, NWM, and water ....")
-    mask_interior_water_raw = gpd.pd.concat([levee, nwm, water], ignore_index=True)
+    if interior_gdfs:
+        print("Defining interior masks for provided tables ....")
+        mask_interior_water_raw = pd.concat(interior_gdfs, ignore_index=True)
 
-    print("Standardizing geometry column name ....")
-    if 'geom' in mask_interior_water_raw.columns:
-        mask_interior_water_raw = mask_interior_water_raw.rename(columns={'geom': 'geometry'}).set_geometry('geometry')
-    mask_interior_water = mask_interior_water_raw.dropna(subset=['geometry'])
+        print("Standardizing geometry column name ....")
+        if 'geom' in mask_interior_water_raw.columns:
+            mask_interior_water_raw = mask_interior_water_raw.rename(columns={'geom': 'geometry'}).set_geometry('geometry')
+        mask_interior_water = mask_interior_water_raw.dropna(subset=['geometry'])
+    else:
+        print("No interior masks provided. Skipping interior mask generation ....")
+        mask_interior_water = gpd.GeoDataFrame(geometry=[], crs="EPSG:4326")
 
     print("Stacking all valid mask components ....")
-    all_mask_parts = gpd.pd.concat([
+    all_mask_parts = pd.concat([
         mask_ring_sch_b,
         mask_ring_state,
         mask_interior_water
@@ -112,6 +131,13 @@ def create_general_mask(database_path: str,
 
     # Ensure crs is set
     step_5 = step_5.set_crs("EPSG:4326")
+
+    # Export to GeoPackage if requested
+    if output_gpkg_path:
+        print(f"Exporting final combined mask to: {output_gpkg_path}")
+        os.makedirs(os.path.dirname(output_gpkg_path) or '.', exist_ok=True)
+        step_5.to_file(output_gpkg_path, layer='mask', driver="GPKG")
+
     # Write to database
     directory = 'temp'
     if not os.path.exists(directory):
