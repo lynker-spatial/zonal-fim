@@ -49,11 +49,37 @@ and there is an optional item to dissolve all geometries into a single multi-pol
 python zonal_fim.py --generate_mask True --preprocess False --generate_wse False --generate_depth False --zarr_format False  --execute False  --dissolve True -k '/path/shape_file_folder/ag_ElementsNodes.zip' -l '/path/output_elements_folder' -a '/path/masks.duckdb' -p 'exterior_mask_schism_boundary_atlantic_buffer_atlgulf' -n 'exterior_mask_state_boundaries_conus_atlgulf' -x 'interior_mask_levee_protected_area_conus_atlgulf' -t 'interior_mask_nwm_lakes_conus_atlgulf' -f 'interior_mask_water_polygon_conus_atlgulf' 
 ```
 
+---
+
+## Step2
+The next step it to generate nodes and elements from the SCHISIM .gr3 file
+
+```shell
+python schism_converter.py \
+    --input "path/to/file/hgrid.gr3" \
+    --elements-output "output/path/to/file/agElementPolygons.gpkg" \
+    --elements-output-pq "output/path/to/file/agElementPolygons.parquet" \
+    --nodes-output "output/path/to/file/hgrid_nodes.gpkg" \
+    --nodes-output-pq "output/path/to/file/hgrid_nodes.parquet"
+```
+
+---
+
+## Step3
+The next step it to generate crosswalk table using SCHISIM internal ocean and land masking.
+
+```shell
+python process_spatial_mask.py \
+    --input "path/to/file/Ocean_Land_Mask_AtlanticGulf_5m.nc" \
+    --output-mask "output/path/to/file/schisim_mask.nc" \
+    --output-csv "output/path/to/file/atl_orig_id.csv" \
+    --filter-mask-val 0
+```
 
 ---
 
 
-## Step2
+## Step4
 Next step is to generate coverage fractions from zonal in R
 
 This step requires:
@@ -88,7 +114,7 @@ The following two steps needed to generate cell coverage fractions:
 ---    
 
 
-## Step3
+## Step5
 Final step in preprocessing is to generate barycentric weights for all none-masked Schisim node. This can be done by calling the script with the following configuration.
 
 Setting all flags to `False` except for <br>
